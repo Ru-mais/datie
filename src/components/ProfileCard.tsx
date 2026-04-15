@@ -9,6 +9,7 @@ interface ProfileProps {
   favoriteFood: string;
   bio: string;
   image?: string;
+  onLike?: () => void;
 }
 
 export default function ProfileCard({ profile }: { profile: ProfileProps }) {
@@ -44,7 +45,10 @@ export default function ProfileCard({ profile }: { profile: ProfileProps }) {
           <button className="flex-1 py-4 glass-morphism rounded-2xl flex items-center justify-center text-white hover:bg-white/20 transition-all border border-white/10">
             <X size={24} />
           </button>
-          <button className="flex-1 py-4 bg-[#D4AF37] rounded-2xl flex items-center justify-center text-black hover:bg-[#B8860B] transition-all shadow-[0_0_20px_rgba(212,175,55,0.4)]">
+          <button 
+            onClick={profile.onLike}
+            className="flex-1 py-4 bg-[#D4AF37] rounded-2xl flex items-center justify-center text-black hover:bg-[#B8860B] transition-all shadow-[0_0_20px_rgba(212,175,55,0.4)]"
+          >
             <Heart size={24} fill="currentColor" />
           </button>
         </div>
