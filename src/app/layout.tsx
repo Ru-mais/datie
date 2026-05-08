@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import { AuthProvider } from "@/context/AuthContext";
+import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
   title: "MalluLove | Premium Kerala Dating App",
@@ -21,8 +23,11 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <Navbar />
-        {children}
+        <AuthProvider>
+          <Toaster position="top-center" />
+          <Navbar />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

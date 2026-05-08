@@ -5,24 +5,20 @@ import Image from "next/image";
 import { Heart, MessageCircle, X, Sparkles } from "lucide-react";
 
 interface MatchOverlayProps {
-  userName: string;
-  isOpen: boolean;
+  matchedUser: {
+    name: string;
+    images?: string[];
+  };
   onClose: () => void;
 }
 
-export default function MatchOverlay({ userName, isOpen, onClose }: MatchOverlayProps) {
+export default function MatchOverlay({ matchedUser, onClose }: MatchOverlayProps) {
   const [showContent, setShowContent] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => setShowContent(true), 300);
-      return () => clearTimeout(timer);
-    } else {
-      setShowContent(false);
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
+    const timer = setTimeout(() => setShowContent(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl transition-all duration-500">
@@ -53,8 +49,12 @@ export default function MatchOverlay({ userName, isOpen, onClose }: MatchOverlay
 
         <div className="mb-8 relative flex justify-center">
             <div className="relative">
-                <div className="w-24 h-24 bg-primary rounded-full flex items-center justify-center animate-bounce shadow-[0_0_50px_rgba(212,175,55,0.6)]">
-                    <Heart size={48} fill="black" className="text-black" />
+                <div className="w-24 h-24 bg-primary rounded-full flex items-center justify-center animate-bounce shadow-[0_0_50px_rgba(212,175,55,0.6)] overflow-hidden">
+                    {matchedUser.images?.[0] ? (
+                      <Image src={matchedUser.images[0]} alt={matchedUser.name} fill className="object-cover" />
+                    ) : (
+                      <Heart size={48} fill="black" className="text-black" />
+                    )}
                 </div>
                 <Sparkles className="absolute -top-4 -right-4 text-primary animate-pulse" size={32} />
             </div>
@@ -64,7 +64,7 @@ export default function MatchOverlay({ userName, isOpen, onClose }: MatchOverlay
           It's a <span className="gold-text">Match!</span>
         </h2>
         <p className="text-white/70 text-lg mb-10">
-          You and <span className="text-primary font-bold">{userName}</span> liked each other.
+          You and <span className="text-primary font-bold">{matchedUser.name}</span> liked each other.
         </p>
 
         <div className="space-y-4">
