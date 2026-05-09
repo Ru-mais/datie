@@ -14,9 +14,14 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: 'http://localhost:3000', // Next.js frontend
+  origin: ['http://localhost:3000', 'http://localhost:3001'], // Allow both ports
   credentials: true,
 }));
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
@@ -26,6 +31,16 @@ app.use('/api/v1/matches', matchRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'active', message: 'MalluLove API is running' });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('💥 ERROR:', err);
+  res.status(err.statusCode || 500).json({
+    status: 'error',
+    message: err.message || 'Internal Server Error',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
 });
 
 // Database connection

@@ -8,5 +8,6 @@ router.use(authMiddleware.protect);
 
 router.get('/discovery', matchController.getDiscoveryProfiles);
 router.post('/swipe', matchController.handleSwipe);
+router.get('/matches', matchController.getMatches);
 
 module.exports = router;

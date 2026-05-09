@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import anime from "animejs";
+import anime from "animejs/lib/anime.es.js";
 import { Heart, Mail, Lock, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";

@@ -33,8 +33,8 @@ export default function Home() {
             Celebrate culture, traditions, and true love.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/discover" className="px-10 py-4 bg-primary text-black font-bold rounded-full hover:bg-primary-hover transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2">
-              <Sparkles className="w-5 h-5" /> Start Dating
+            <Link href="/register" className="px-10 py-4 bg-primary text-black font-bold rounded-full hover:bg-primary-hover transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(212,175,55,0.4)] flex items-center justify-center gap-2">
+              <Sparkles className="w-5 h-5" /> Join Now
             </Link>
             <button className="px-10 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white font-bold rounded-full hover:bg-white/20 transition-all">
               Learn More

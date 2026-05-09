@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, Search, MessageCircle, User } from "lucide-react";
+import { Heart, Search, MessageCircle, User, LogIn } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { user, loading } = useAuth();
 
   return (
-    <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl px-6 py-4 glass-morphism rounded-[2rem] flex items-center justify-between border border-white/20 shadow-2xl">
+    <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-4xl px-6 py-4 glass-morphism rounded-[2rem] flex items-center justify-between border border-white/20 shadow-2xl">
       <Link href="/" className="flex items-center gap-2">
         <div className="bg-[#D4AF37] p-1.5 rounded-lg">
           <Heart size={18} fill="black" className="text-black" />
@@ -20,14 +22,31 @@ export default function Navbar() {
 
       <div className="flex items-center gap-1 sm:gap-4">
         <NavLink href="/" active={pathname === "/"} label="Home" />
-        <NavLink href="/discover" active={pathname === "/discover"} label="Discover" icon={<Search size={18} />} />
-        <NavLink href="/chat" active={pathname === "/chat"} label="Chat" icon={<MessageCircle size={18} />} />
-        <NavLink href="/profile" active={pathname === "/profile"} label="Profile" icon={<User size={18} />} />
+        {user ? (
+          <>
+            <NavLink href="/discover" active={pathname === "/discover"} label="Discover" icon={<Search size={18} />} />
+            <NavLink href="/matches" active={pathname === "/matches"} label="Matches" icon={<Heart size={18} />} />
+            <NavLink href="/chat" active={pathname === "/chat"} label="Chat" icon={<MessageCircle size={18} />} />
+            <NavLink href="/profile" active={pathname === "/profile"} label="Profile" icon={<User size={18} />} />
+          </>
+        ) : (
+          <NavLink href="/login" active={pathname === "/login"} label="Sign In" icon={<LogIn size={18} />} />
+        )}
       </div>
 
-      <button className="hidden sm:block px-5 py-2 bg-[#D4AF37] text-black text-sm font-bold rounded-full hover:bg-[#B8860B] transition-all">
-        Join Now
-      </button>
+      {!user && !loading && (
+        <Link href="/register" className="hidden sm:block px-5 py-2 bg-[#D4AF37] text-black text-sm font-bold rounded-full hover:bg-[#B8860B] transition-all">
+          Join Now
+        </Link>
+      )}
+      
+      {user && (
+        <div className="hidden sm:flex items-center gap-2">
+           <div className="w-8 h-8 rounded-full bg-[#D4AF37] flex items-center justify-center text-black font-bold text-xs">
+              {user.name[0]}
+           </div>
+        </div>
+      )}
     </nav>
   );
 }

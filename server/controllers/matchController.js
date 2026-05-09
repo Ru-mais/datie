@@ -84,3 +84,24 @@ exports.handleSwipe = async (req, res) => {
     });
   }
 };
+
+exports.getMatches = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).populate({
+      path: 'matches',
+      select: 'name age district profession images bio'
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        matches: user.matches,
+      },
+    });
+  } catch (err) {
+    res.status(400).json({
+      status: 'fail',
+      message: err.message,
+    });
+  }
+};

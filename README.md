@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MalluLove 🥥❤️
 
-## Getting Started
+**The Premium Dating Platform for Kerala.**
 
-First, run the development server:
+MalluLove is a modern, high-performance dating application built specifically for the Malayali community. It combines a sleek, cinematic user experience with culturally relevant discovery features, making it easier than ever for Keralites to find meaningful connections.
 
+![Project Status](https://img.shields.io/badge/Status-Development-gold)
+![Tech Stack](https://img.shields.io/badge/Stack-MERN-green)
+
+---
+
+## ✨ Key Features
+
+### 🎞️ Cinematic Experience
+- **Premium UI/UX**: Built with Next.js 16 and TailwindCSS, featuring glassmorphism and smooth animations using `anime.js`.
+- **Responsive Design**: Optimized for everything from iPhone screens in Kochi to desktops in Trivandrum.
+
+### 🛡️ Secure Authentication
+- **JWT-based Auth**: Secure session management using HTTP-only cookies.
+- **Onboarding**: A dedicated registration flow capturing cultural details like Home District and Profession.
+
+### 🔍 Cultural Discovery
+- **District Filters**: Find matches in your specific Kerala district (Ernakulam, Kozhikode, Thrissur, etc.).
+- **Smart Swiping**: A Tinder-style discovery engine that excludes already-swiped profiles and highlights premium users.
+- **Mutual Matches**: Real-time detection of mutual interest with a dedicated **Matches Dashboard**.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 16 (App Router), React, Axios, Lucide Icons, Anime.js.
+- **Backend**: Node.js, Express.js.
+- **Database**: MongoDB (Atlas) with Mongoose ODM.
+- **State Management**: React Context API for global Authentication and Match state.
+- **Security**: Bcrypt.js for password hashing, Cookie-parser for secure JWT handling.
+
+---
+
+## 🚀 Getting Started
+
+### 1. Clone the repository
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone [your-repo-link]
+cd datii
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Setup Environment Variables
+Create a `.env` file in the `server` directory:
+```env
+PORT=5000
+DATABASE=your_mongodb_connection_string
+DATABASE_PASSWORD=your_password
+JWT_SECRET=your_secret_key
+JWT_EXPIRES_IN=90d
+JWT_COOKIE_EXPIRES_IN=90
+NODE_ENV=development
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Install Dependencies
+```bash
+# In the root directory
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# In the server directory
+cd server && npm install
+```
 
-## Learn More
+### 4. Run the application
+```bash
+# Start Backend (Port 5000)
+cd server && npm run dev
 
-To learn more about Next.js, take a look at the following resources:
+# Start Frontend (Port 3001)
+cd .. && npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🗺️ Roadmap
+- [ ] **Real-Time Chat**: Integration with Socket.io for instant messaging.
+- [ ] **Image Uploads**: Cloudinary integration for user portraits.
+- [ ] **Premium Membership**: Razorpay/Stripe integration for unlimited swipes.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📄 License
+This project is for demonstration and portfolio purposes. All rights reserved.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Created with ❤️ for Kerala.
