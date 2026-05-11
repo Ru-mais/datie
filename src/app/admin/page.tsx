@@ -18,8 +18,7 @@ export default function AdminDashboard() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     // In a real app, this would check against a secure env variable
-    // For now, let's use a unique sequence or your secret
-    if (adminPass === "DatieAdmin2026") {
+    if (adminPass === process.env.NEXT_PUBLIC_ADMIN_KEY) {
        setIsAuthenticated(true);
        toast.success("Welcome back, Commander.");
     } else {
@@ -63,7 +62,7 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           uid, 
-          adminSecret: "DatieAdmin2026" // In production, use env variable
+          adminSecret: process.env.NEXT_PUBLIC_ADMIN_KEY
         })
       });
 

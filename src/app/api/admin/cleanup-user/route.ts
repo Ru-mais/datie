@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     const { uid, adminSecret } = await req.json();
 
     // Security Check: Match the dashboard's master key
-    if (adminSecret !== "DatieAdmin2026") {
+    if (adminSecret !== process.env.NEXT_PUBLIC_ADMIN_KEY) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
