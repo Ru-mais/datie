@@ -346,20 +346,6 @@ export default function ProfilePage() {
                       <div className="space-y-2 mt-6">
                         <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bio</label>
                         <textarea value={editData.bio} onChange={(e) => setEditData({...editData, bio: e.target.value})} placeholder="Tell your story..." className="w-full p-6 border-2 border-black rounded-[2rem] min-h-[150px] font-medium focus:outline-none bg-white shadow-sm" />
-                        <div className="pt-12 border-t-2 border-gray-100 flex flex-col gap-4">
-                          <button 
-                            onClick={logout}
-                            className="w-full py-4 flex items-center justify-center gap-3 bg-gray-50 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-black hover:text-white transition-all shadow-sm"
-                          >
-                            <LogOut size={18} /> Logout Session
-                          </button>
-                          <button 
-                            onClick={handleRequestDeletion}
-                            className="w-full py-4 flex items-center justify-center gap-3 bg-red-50 text-red-500 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
-                          >
-                            <Trash2 size={18} /> Request Account Deletion
-                          </button>
-                        </div>
                       </div>
                     </div>
 
@@ -394,6 +380,22 @@ export default function ProfilePage() {
                     )}
                   </div>
                 )}
+
+                {/* Persistent Action Buttons (Logout & Request Deletion) */}
+                <div className="mt-12 pt-12 border-t-2 border-gray-100 flex flex-col gap-4 max-w-md mx-auto">
+                   <button 
+                     onClick={logout}
+                     className="w-full py-4 flex items-center justify-center gap-3 bg-gray-50 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-black hover:text-white transition-all shadow-sm"
+                   >
+                     <LogOut size={18} /> Logout Session
+                   </button>
+                   <button 
+                     onClick={handleRequestDeletion}
+                     className="w-full py-4 flex items-center justify-center gap-3 bg-red-50 text-red-500 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                   >
+                     <Trash2 size={18} /> Request Account Deletion
+                   </button>
+                </div>
               </div>
             </div>
 
