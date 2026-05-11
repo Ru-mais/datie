@@ -355,7 +355,7 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div className="space-y-12">
-                    <p className="text-2xl text-gray-600 leading-relaxed font-medium italic">"{profile?.bio || "A great connection needs a story. Click edit to start yours..."}"</p>
+                    <p className="text-2xl text-gray-600 leading-relaxed font-medium italic">&quot;{profile?.bio || "A great connection needs a story. Click edit to start yours..."}&quot;</p>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
                       <InfoBadge icon={<Briefcase size={16}/>} label="Work" value={profile?.profession} />
                       <InfoBadge icon={<GraduationCap size={16}/>} label="Education" value={profile?.education} />

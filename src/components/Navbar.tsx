@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, User, LogIn, Search, MessageCircle, Home } from "lucide-react";
+import { Heart, User, Search, Home } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {

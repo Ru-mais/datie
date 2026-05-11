@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { animate } from "animejs";
-import { Heart, X, MapPin, Search, Filter, Loader2, User, SlidersHorizontal, Check, Plus } from "lucide-react";
+import { Heart, X, MapPin, Search, Filter, Loader2, User, Check } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, getDocs, limit, doc, setDoc, getDoc, serverTimestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -169,9 +169,9 @@ export default function DiscoverPage() {
                <User size={48} className="text-gray-200" />
                <div className="absolute inset-0 rounded-full border-2 border-gray-100 animate-ping opacity-20" />
             </div>
-            <h2 className="text-4xl font-black tracking-tighter uppercase italic mb-4">You're our First Member!</h2>
+            <h2 className="text-4xl font-black tracking-tighter uppercase italic mb-4">You&apos;re our First Member!</h2>
             <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-[10px] mb-10 max-w-xs mx-auto leading-loose">
-              Welcome to Datii. There aren't any other profiles yet. Why not invite some friends to start the connection?
+              Welcome to Datii. There aren&apos;t any other profiles yet. Why not invite some friends to start the connection?
             </p>
             <button 
               onClick={() => router.push("/profile")}
@@ -200,7 +200,7 @@ export default function DiscoverPage() {
                        <MapPin size={12} /> {item.district}
                     </div>
                   </div>
-                  <p className="text-xs text-white/80 font-medium mb-6 line-clamp-2 italic">"{item.bio || "Searching for a story..."}"</p>
+                  <p className="text-xs text-white/80 font-medium mb-6 line-clamp-2 italic">&quot;{item.bio || "Searching for a story..."}&quot;</p>
                   <div className="flex gap-4">
                     <button 
                       onClick={() => handleLike(item)}
@@ -274,7 +274,7 @@ export default function DiscoverPage() {
       {matchingWith && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl">
           <div className="text-center space-y-8 max-w-lg w-full">
-            <h2 className="text-7xl font-black italic tracking-tighter text-white uppercase mb-4">It's a Match!</h2>
+            <h2 className="text-7xl font-black italic tracking-tighter text-white uppercase mb-4">It&apos;s a Match!</h2>
             <p className="text-gray-400 font-bold uppercase tracking-[0.3em] text-[10px]">You and {matchingWith.name} like each other</p>
             <div className="flex items-center justify-center gap-8 py-12">
               <div className="w-32 h-32 rounded-full border-4 border-white overflow-hidden shadow-2xl rotate-[-5deg]">

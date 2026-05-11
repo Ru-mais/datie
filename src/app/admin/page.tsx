@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldAlert, Trash2, User, Clock, CheckCircle, Lock, ArrowRight, ShieldCheck, Flag } from "lucide-react";
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { Trash2, User, Clock, ArrowRight, ShieldCheck, Flag } from "lucide-react";
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import toast from "react-hot-toast";
 import { animate } from "animejs";
@@ -178,7 +178,7 @@ export default function AdminDashboard() {
                           <span className="px-3 py-1 bg-orange-100 text-orange-600 text-[8px] font-black uppercase tracking-widest rounded-full">Reported</span>
                           <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{new Date(rep.timestamp?.seconds * 1000).toLocaleDateString()}</span>
                        </div>
-                       <p className="text-gray-500 font-medium leading-relaxed mb-6 italic">"{rep.reason}"</p>
+                       <p className="text-gray-500 font-medium leading-relaxed mb-6 italic">&quot;{rep.reason}&quot;</p>
                        <div className="flex items-center justify-between">
                           <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Target UID: {rep.reportedId.substring(0, 10)}...</span>
                           <button 
