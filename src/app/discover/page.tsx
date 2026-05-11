@@ -125,7 +125,7 @@ export default function DiscoverPage() {
   };
 
   useEffect(() => {
-    if (!isFetching && filteredUsers.length > 0) {
+    if (!isFetching) {
       animate('.animate-card', {
         opacity: [0, 1],
         scale: [0.9, 1],
