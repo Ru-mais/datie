@@ -311,7 +311,17 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="space-y-4 pt-6 border-t border-gray-100">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-300">2. Vibe & Bio</h3>
+                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-300">2. Personal Details</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <EditInput label="Profession" value={editData.profession} onChange={(v:string) => setEditData({...editData, profession: v})} />
+                        <EditInput label="Education" value={editData.education} onChange={(v:string) => setEditData({...editData, education: v})} />
+                        <EditInput label="Religion / Caste" value={editData.religion} onChange={(v:string) => setEditData({...editData, religion: v})} />
+                        <EditInput label="Height (e.g. 175cm)" value={editData.height} onChange={(v:string) => setEditData({...editData, height: v})} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 pt-6 border-t border-gray-100">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-300">3. Vibe & Bio</h3>
                       <EditSelect label="Looking For" value={editData.lookingFor} options={LOOKING_FOR} onChange={(v) => setEditData({...editData, lookingFor: v})} />
                       
                       {/* Interests Input */}
