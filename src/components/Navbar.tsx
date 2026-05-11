@@ -18,12 +18,15 @@ export default function Navbar() {
       
       <div className="flex items-center gap-6">
         {!user ? (
-          <>
-            <Link href="/login" className="text-[10px] font-black uppercase tracking-widest hover:opacity-50 transition-all">Sign In</Link>
-            <Link href="/signup" className="text-[10px] font-black uppercase tracking-widest bg-black text-white px-8 py-3 rounded-full hover:scale-105 transition-all shadow-xl">
-              Join Datie.
-            </Link>
-          </>
+          // Hide redundant links on entry pages to avoid "two login options" confusion
+          !["/", "/login", "/signup"].includes(pathname) && (
+            <>
+              <Link href="/login" className="text-[10px] font-black uppercase tracking-widest hover:opacity-50 transition-all">Sign In</Link>
+              <Link href="/signup" className="text-[10px] font-black uppercase tracking-widest bg-black text-white px-8 py-3 rounded-full hover:scale-105 transition-all shadow-xl">
+                Join Datie.
+              </Link>
+            </>
+          )
         ) : (
           <div className="flex items-center gap-8">
             <NavLink href="/" active={pathname === "/"} label="Home" icon={<Home size={18} />} />

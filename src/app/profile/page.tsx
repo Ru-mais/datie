@@ -265,10 +265,6 @@ export default function ProfilePage() {
               <span className="flex items-center gap-2 text-black"><Heart size={12} className="fill-black" /> {profile?.lookingFor}</span>
             </div>
           </div>
-
-          <button onClick={logout} className="p-4 border-2 border-black rounded-2xl hover:bg-black hover:text-white transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest">
-            <LogOut size={18} /> Logout
-          </button>
         </div>
 
         {/* Tab Content */}
@@ -381,20 +377,38 @@ export default function ProfilePage() {
                   </div>
                 )}
 
-                {/* Persistent Action Buttons (Logout & Request Deletion) */}
-                <div className="mt-12 pt-12 border-t-2 border-gray-100 flex flex-col gap-4 max-w-md mx-auto">
-                   <button 
-                     onClick={logout}
-                     className="w-full py-4 flex items-center justify-center gap-3 bg-gray-50 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-black hover:text-white transition-all shadow-sm"
-                   >
-                     <LogOut size={18} /> Logout Session
-                   </button>
-                   <button 
-                     onClick={handleRequestDeletion}
-                     className="w-full py-4 flex items-center justify-center gap-3 bg-red-50 text-red-500 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
-                   >
-                     <Trash2 size={18} /> Request Account Deletion
-                   </button>
+                {/* Settings & Security Section */}
+                <div className="mt-20 space-y-12">
+                   <div className="pt-12 border-t-2 border-gray-100">
+                      <h3 className="text-xs font-black uppercase tracking-[0.3em] text-gray-300 mb-8 text-center">Settings & Security</h3>
+                      <div className="max-w-md mx-auto space-y-4">
+                         <button 
+                           onClick={logout}
+                           className="w-full py-5 flex items-center justify-center gap-3 bg-black text-white font-black uppercase text-[10px] tracking-widest rounded-2xl hover:scale-[1.02] transition-all shadow-xl"
+                         >
+                           <LogOut size={18} /> Logout Session
+                         </button>
+                      </div>
+                   </div>
+
+                   {/* Danger Zone */}
+                   <div className="p-8 bg-red-50/50 rounded-[2.5rem] border-2 border-dashed border-red-100">
+                      <div className="text-center space-y-6">
+                         <div className="flex flex-col items-center gap-2">
+                            <ShieldAlert size={24} className="text-red-500" />
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-red-500">Danger Zone</h4>
+                         </div>
+                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                            Requesting deletion will permanently remove all your data within 24 hours after admin review.
+                         </p>
+                         <button 
+                           onClick={handleRequestDeletion}
+                           className="px-10 py-4 bg-white text-red-500 border-2 border-red-100 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-red-500 hover:text-white hover:border-red-500 transition-all shadow-sm"
+                         >
+                           <Trash2 size={18} /> Request Account Deletion
+                         </button>
+                      </div>
+                   </div>
                 </div>
               </div>
             </div>
