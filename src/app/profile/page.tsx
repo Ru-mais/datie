@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useRef } from "react";
 import { animate } from "animejs";
-import { User, Heart, Settings, MapPin, Phone, Calendar, LogOut, Plus, X, Star, Languages, Smile, Loader2, Camera, Briefcase, GraduationCap, Ruler, MessageSquare, HeartHandshake, Mail, Check, ShieldAlert, Edit2, Save } from "lucide-react";
+import { Camera, User, LogOut, Settings, ShieldAlert, Plus, Loader2, X, Trash2, Heart, MapPin, Phone, Calendar, Star, Languages, Smile, Briefcase, GraduationCap, Ruler, MessageSquare, HeartHandshake, Mail, Check, Edit2, Save } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -189,7 +189,25 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold italic text-3xl">Datii.</div>;
+  const handleRequestDeletion = async () => {
+    if (!confirm("Are you sure you want to request account deletion? An admin will review your request and permanently remove your data within 24 hours.")) return;
+    try {
+      await addDoc(collection(db, "deletion_requests"), {
+        uid: user?.uid,
+        email: user?.email,
+        timestamp: serverTimestamp(),
+        status: "pending"
+      });
+      toast.success("Request sent to Admin. You will be logged out shortly.");
+      setTimeout(() => logout(), 3000);
+    } catch (err) {
+      toast.error("Failed to send request");
+    }
+  };
+
+  if (loading || !profile) return (
+    <div className="min-h-screen flex items-center justify-center bg-white font-black italic text-3xl text-black">Datie.</div>
+  );
 
   return (
     <main className="min-h-screen bg-white pt-32 pb-20 px-6">
@@ -328,6 +346,20 @@ export default function ProfilePage() {
                       <div className="space-y-2 mt-6">
                         <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bio</label>
                         <textarea value={editData.bio} onChange={(e) => setEditData({...editData, bio: e.target.value})} placeholder="Tell your story..." className="w-full p-6 border-2 border-black rounded-[2rem] min-h-[150px] font-medium focus:outline-none bg-white shadow-sm" />
+                        <div className="pt-12 border-t-2 border-gray-100 flex flex-col gap-4">
+                          <button 
+                            onClick={logout}
+                            className="w-full py-4 flex items-center justify-center gap-3 bg-gray-50 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-black hover:text-white transition-all shadow-sm"
+                          >
+                            <LogOut size={18} /> Logout Session
+                          </button>
+                          <button 
+                            onClick={handleRequestDeletion}
+                            className="w-full py-4 flex items-center justify-center gap-3 bg-red-50 text-red-500 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                          >
+                            <Trash2 size={18} /> Request Account Deletion
+                          </button>
+                        </div>
                       </div>
                     </div>
 
