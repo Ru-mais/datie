@@ -376,48 +376,68 @@ export default function ProfilePage() {
                     )}
                   </div>
                 )}
-
-                {/* Settings & Security Section */}
-                <div className="mt-20 space-y-12">
-                   <div className="pt-12 border-t-2 border-gray-100">
-                      <h3 className="text-xs font-black uppercase tracking-[0.3em] text-gray-300 mb-8 text-center">Settings & Security</h3>
-                      <div className="max-w-md mx-auto space-y-4">
-                         <button 
-                           onClick={logout}
-                           className="w-full py-5 flex items-center justify-center gap-3 bg-black text-white font-black uppercase text-[10px] tracking-widest rounded-2xl hover:scale-[1.02] transition-all shadow-xl"
-                         >
-                           <LogOut size={18} /> Logout Session
-                         </button>
-                      </div>
-                   </div>
-
-                   {/* Danger Zone */}
-                   <div className="p-8 bg-red-50/50 rounded-[2.5rem] border-2 border-dashed border-red-100">
-                      <div className="text-center space-y-6">
-                         <div className="flex flex-col items-center gap-2">
-                            <ShieldAlert size={24} className="text-red-500" />
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-red-500">Danger Zone</h4>
-                         </div>
-                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
-                            Requesting deletion will permanently remove all your data within 24 hours after admin review.
-                         </p>
-                         <button 
-                           onClick={handleRequestDeletion}
-                           className="px-10 py-4 bg-white text-red-500 border-2 border-red-100 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-red-500 hover:text-white hover:border-red-500 transition-all shadow-sm"
-                         >
-                           <Trash2 size={18} /> Request Account Deletion
-                         </button>
-                      </div>
-                   </div>
-                </div>
               </div>
             </div>
 
+            {/* Sidebar: Score & Settings */}
             <div className="space-y-8">
-              <div className="p-8 bg-black text-white rounded-[2.5rem] shadow-2xl text-center overflow-hidden">
+              {/* Identity Score */}
+              <div className="p-8 bg-black text-white rounded-[2.5rem] shadow-2xl text-center overflow-hidden animate-profile opacity-0">
                  <h3 className="text-[10px] font-black uppercase tracking-[0.4em] mb-4 opacity-50">Identity Score</h3>
-                 <div className="text-7xl font-black text-blue-400 mb-2">100%</div>
+                 <div className="text-7xl font-black text-blue-400 mb-2">
+                   {(() => {
+                     const fields = [profile?.name, profile?.age, profile?.bio, profile?.profession, profile?.education, profile?.religion, profile?.photoURL, profile?.interests?.length];
+                     const filled = fields.filter(f => f).length;
+                     return Math.round((filled / fields.length) * 100);
+                   })()}%
+                 </div>
+                 {(() => {
+                     const fields = [profile?.name, profile?.age, profile?.bio, profile?.profession, profile?.education, profile?.religion, profile?.photoURL, profile?.interests?.length];
+                     const filled = fields.filter(f => f).length;
+                     if (filled < fields.length) {
+                       return (
+                         <div className="mt-4 p-4 bg-white/5 rounded-2xl border border-white/10">
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-blue-300 animate-pulse">
+                               Finish your story to reach 100%
+                            </p>
+                         </div>
+                       );
+                     }
+                     return <p className="text-[9px] font-bold uppercase tracking-widest text-green-400">Elite Profile Verified</p>;
+                   })()}
               </div>
+
+              {/* Settings & Security Section */}
+              <div className="space-y-6 animate-profile opacity-0">
+                 <div className="p-8 border-2 border-gray-100 rounded-[2.5rem] bg-white">
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 mb-6">Account Settings</h3>
+                    <div className="space-y-4">
+                       <button 
+                         onClick={logout}
+                         className="w-full py-4 flex items-center justify-center gap-3 bg-black text-white font-black uppercase text-[10px] tracking-widest rounded-2xl hover:scale-[1.02] transition-all shadow-lg"
+                       >
+                         <LogOut size={16} /> Logout Session
+                       </button>
+                    </div>
+                 </div>
+
+                 {/* Danger Zone */}
+                 <div className="p-8 bg-red-50/30 rounded-[2.5rem] border-2 border-dashed border-red-50">
+                    <div className="text-center space-y-4">
+                       <div className="flex flex-col items-center gap-2">
+                          <ShieldAlert size={20} className="text-red-400" />
+                          <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-red-400">Danger Zone</h4>
+                       </div>
+                       <button 
+                         onClick={handleRequestDeletion}
+                         className="w-full py-3 bg-white text-red-500 border border-red-100 font-black uppercase text-[9px] tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                       >
+                         Request Deletion
+                       </button>
+                    </div>
+                 </div>
+              </div>
+
             </div>
           </div>
         </div>
