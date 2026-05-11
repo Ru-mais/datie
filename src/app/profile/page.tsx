@@ -147,7 +147,7 @@ export default function ProfilePage() {
   };
 
   const handleVerifyOTP = async () => {
-    if (otpCode === "123456") { // Simulated success code
+    if (otpCode === (process.env.NEXT_PUBLIC_TEST_OTP || "123456")) { // Simulated success code
        setEditData({...editData, phoneVerified: true});
        setVerificationId(null);
        setOtpCode("");

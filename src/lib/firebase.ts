@@ -17,7 +17,7 @@ export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfi
 const auth = getAuth(app);
 const db = getFirestore(app);
 // Using explicit bucket URL to prevent "stuck loading" issues
-export const storage = getStorage(app, "gs://datii-26.firebasestorage.app");
+export const storage = getStorage(app, `gs://${process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}`);
 const googleProvider = new GoogleAuthProvider();
 
 export { auth, db, googleProvider };
