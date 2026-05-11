@@ -32,9 +32,11 @@ export default function SignupPage() {
   const [otp, setOtp] = useState("");
   const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (user) router.push("/discover");
+    setMounted(true);
+    if (user && mounted) router.push("/discover");
 
     animate('.animate-signup', {
       opacity: [0, 1],
