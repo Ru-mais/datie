@@ -1,89 +1,75 @@
-# MalluLove 🥥❤️
+# Datie. 💎
 
-**The Premium Dating Platform for Kerala.**
-
-MalluLove is a modern, high-performance dating application built specifically for the Malayali community. It combines a sleek, cinematic user experience with culturally relevant discovery features, making it easier than ever for Keralites to find meaningful connections.
-
-![Project Status](https://img.shields.io/badge/Status-Development-gold)
-![Tech Stack](https://img.shields.io/badge/Stack-MERN-green)
+**Datie.** is a premium, high-security dating platform designed for meaningful connections. Built with a "Security-First" philosophy, it combines a minimalist, high-fidelity aesthetic with advanced AI moderation and real-world identity verification.
 
 ---
 
-## ✨ Key Features
+## 🛡️ Security Architecture
 
-### 🎞️ Cinematic Experience
-- **Premium UI/UX**: Built with Next.js 16 and TailwindCSS, featuring glassmorphism and smooth animations using `anime.js`.
-- **Responsive Design**: Optimized for everything from iPhone screens in Kochi to desktops in Trivandrum.
+### 📱 Real-World Identity Verification
+Unlike traditional platforms that rely on easily faked emails, **Datie.** uses a **Phone-First Gateway**.
+- **SMS OTP Integration**: Integrated with Firebase Phone Auth and invisible reCAPTCHA.
+- **Verified Signup**: Users must verify their physical SIM card ownership before an account is ever created.
+- **Unified Identity**: Seamlessly links verified phone numbers with secure email/password credentials for a single, robust user record.
 
-### 🛡️ Secure Authentication
-- **JWT-based Auth**: Secure session management using HTTP-only cookies.
-- **Onboarding**: A dedicated registration flow capturing cultural details like Home District and Profession.
+### 🔞 AI Safety Lens (Content Moderation)
+Every profile photo is a part of our safety perimeter.
+- **Google Cloud Vision AI**: Real-time analysis of every uploaded image.
+- **Automated Filtering**: Instantly blocks inappropriate content, violence, or spoofed faces using server-side 'Safe Search' detection.
 
-### 🔍 Cultural Discovery
-- **District Filters**: Find matches in your specific Kerala district (Ernakulam, Kozhikode, Thrissur, etc.).
-- **Smart Swiping**: A Tinder-style discovery engine that excludes already-swiped profiles and highlights premium users.
-- **Mutual Matches**: Real-time detection of mutual interest with a dedicated **Matches Dashboard**.
-
----
-
-## 🛠️ Tech Stack
-
-- **Frontend**: Next.js 16 (App Router), React, Axios, Lucide Icons, Anime.js.
-- **Backend**: Node.js, Express.js.
-- **Database**: MongoDB (Atlas) with Mongoose ODM.
-- **State Management**: React Context API for global Authentication and Match state.
-- **Security**: Bcrypt.js for password hashing, Cookie-parser for secure JWT handling.
+### 🤐 Chat Smart Shield
+The conversation space is protected by an active monitoring layer.
+- **Profanity Filtering**: Real-time regex-based sanitization of messages.
+- **Malicious Link Detection**: Scans for external URLs to prevent scams and phishing, warning users in real-time.
 
 ---
 
-## 🚀 Getting Started
+## ✨ Premium Features
 
-### 1. Clone the repository
+- **Minimalist UX**: A high-end, monochrome design language inspired by luxury fashion interfaces.
+- **Discovery Engine**: Optimized Firestore queries that filter out blocked, liked, and incomplete profiles to keep the feed fresh.
+- **Star Gazers**: A dedicated space to see who liked you, enabling instant mutual matching and chat creation.
+- **Matched Profile Inspector**: Detailed profile views for matches, allowing users to safely learn more about their connections.
+- **Total User Control**: Full support for message editing, deletion, chat blocking, and profile management.
+
+---
+
+## 🚀 Technical Stack
+
+- **Frontend**: Next.js 15 (App Router), React, TailwindCSS.
+- **Backend**: Firebase (Auth, Firestore), Next.js API Routes.
+- **AI**: Google Cloud Vision AI (Image Moderation).
+- **Animations**: Anime.js for smooth, high-fidelity transitions.
+- **State Management**: React Context & Hooks.
+
+---
+
+## 🛠️ Setup & Installation
+
+### 1. Environment Configuration
+Create a `.env` file in the root directory:
 ```bash
-git clone [your-repo-link]
-cd datii
+NEXT_PUBLIC_FIREBASE_API_KEY=your_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_domain
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_id
+GOOGLE_VISION_API_KEY=your_google_ai_key
 ```
 
-### 2. Setup Environment Variables
-Create a `.env` file in the `server` directory:
-```env
-PORT=5000
-DATABASE=your_mongodb_connection_string
-DATABASE_PASSWORD=your_password
-JWT_SECRET=your_secret_key
-JWT_EXPIRES_IN=90d
-JWT_COOKIE_EXPIRES_IN=90
-NODE_ENV=development
-```
-
-### 3. Install Dependencies
+### 2. Install Dependencies
 ```bash
-# In the root directory
 npm install
-
-# In the server directory
-cd server && npm install
 ```
 
-### 4. Run the application
+### 3. Run Development Server
 ```bash
-# Start Backend (Port 5000)
-cd server && npm run dev
-
-# Start Frontend (Port 3001)
-cd .. && npm run dev
+npm run dev
 ```
 
 ---
 
-## 🗺️ Roadmap
-- [ ] **Real-Time Chat**: Integration with Socket.io for instant messaging.
-- [ ] **Image Uploads**: Cloudinary integration for user portraits.
-- [ ] **Premium Membership**: Razorpay/Stripe integration for unlimited swipes.
+## 📜 Development Philosophy
+**Datie.** was built to prove that dating apps can be both beautiful and bulletproof. By moving verification to the signup gate and using AI for moderation, we ensure that every connection is real, safe, and meaningful.
 
 ---
 
-## 📄 License
-This project is for demonstration and portfolio purposes. All rights reserved.
-
-Created with ❤️ for Kerala.
+**Built with ❤️ for the community.**

@@ -1,88 +1,146 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
-import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  signOut, 
+  User,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile
+} from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, googleProvider, db } from "@/lib/firebase";
 
-interface User {
-  _id: string;
+interface UserProfile {
+  uid: string;
   name: string;
   email: string;
-  district: string;
-  isPremium: boolean;
-  images: string[];
+  age?: number;
+  district?: string;
+  phone?: string;
+  phoneVerified?: boolean;
+  photoURL?: string;
+  bio?: string;
+  interests?: string[];
+  languages?: string[];
+  gender?: string;
+  lookingFor?: string;
+  profession?: string;
+  education?: string;
+  religion?: string;
+  height?: string;
+  vibe?: string[];
 }
 
 interface AuthContextType {
   user: User | null;
+  profile: UserProfile | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  checkAuth: () => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  loginWithEmail: (email: string, pass: string) => Promise<void>;
+  signupWithEmail: (email: string, pass: string, name: string, extra: Partial<UserProfile>) => Promise<void>;
+  logout: () => Promise<void>;
+  setProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
-  const api = axios.create({
-    baseURL: 'http://localhost:5000/api/v1',
-    withCredentials: true,
-  });
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        try {
+          const docRef = doc(db, "users", firebaseUser.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            setProfile(docSnap.data() as UserProfile);
+          } else {
+            // Create a basic profile if it's missing
+            const basicProfile = {
+              uid: firebaseUser.uid,
+              name: firebaseUser.displayName || "New User",
+              email: firebaseUser.email || "",
+              createdAt: new Date()
+            };
+            setProfile(basicProfile as UserProfile);
+          }
+        } catch (error) {
+          console.error("Firestore Fetch Error (Offline?):", error);
+          // Don't crash, just show basic info from Auth
+          setProfile({
+            uid: firebaseUser.uid,
+            name: firebaseUser.displayName || "User",
+            email: firebaseUser.email || ""
+          } as UserProfile);
+        }
+      } else {
+        setProfile(null);
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  const checkAuth = async () => {
-    try {
-      // Assuming we have a /auth/me or similar endpoint, or just check cookies
-      // For now, let's mock it or just set loading false
-      setLoading(false);
-    } catch (err) {
-      setUser(null);
-      setLoading(false);
+  const loginWithGoogle = async () => {
+    const res = await signInWithPopup(auth, googleProvider);
+    if (res.user) {
+      // Save basic profile for Google users if it doesn't exist
+      const docRef = doc(db, "users", res.user.uid);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        await setDoc(docRef, {
+          uid: res.user.uid,
+          name: res.user.displayName,
+          email: res.user.email,
+          photoURL: res.user.photoURL,
+          createdAt: new Date()
+        });
+      }
     }
   };
 
-  const login = async (email: string, password: string) => {
-    try {
-      const { data } = await api.post('/auth/login', { email, password });
-      setUser(data.data.user);
-      toast.success('Welcome back to MalluLove!');
-      router.push('/discover');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Login failed');
-      throw err;
+  const loginWithEmail = async (email: string, pass: string) => {
+    await signInWithEmailAndPassword(auth, email, pass);
+  };
+
+  const signupWithEmail = async (email: string, pass: string, name: string, extra: Partial<UserProfile>) => {
+    const res = await createUserWithEmailAndPassword(auth, email, pass);
+    if (res.user) {
+      await updateProfile(res.user, { displayName: name });
+      const userProfile = {
+        uid: res.user.uid,
+        name,
+        email,
+        ...extra,
+        createdAt: new Date()
+      };
+      await setDoc(doc(db, "users", res.user.uid), userProfile);
+      setProfile(userProfile as UserProfile);
     }
   };
 
   const logout = async () => {
-    try {
-      await api.get('/auth/logout');
-      setUser(null);
-      router.push('/login');
-      toast.success('Logged out successfully');
-    } catch (err) {
-      toast.error('Logout failed');
-    }
+    await signOut(auth);
   };
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, checkAuth }}>
+    <AuthContext.Provider value={{ user, profile, loading, loginWithGoogle, loginWithEmail, signupWithEmail, logout, setProfile }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

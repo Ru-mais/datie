@@ -5,8 +5,8 @@ import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
-  title: "MalluLove | Premium Kerala Dating App",
-  description: "The most exclusive dating experience for the Malayali community. Find your Keralite soulmate today.",
+  title: "Datie. | Find Your Spark in Kerala",
+  description: "The most exclusive space for the Malayali community to find meaningful connections.",
 };
 
 export default function RootLayout({
@@ -17,10 +17,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="icon" href="/favicon.ico" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet" />
       </head>
       <body>
         <AuthProvider>

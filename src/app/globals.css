@@ -1,61 +1,22 @@
 @import "tailwindcss";
 
-@theme {
-  --color-primary: #D4AF37;
-  --color-primary-hover: #B8860B;
-  --color-secondary: #FDF5E6;
-  --color-accent: #800000;
-}
-
 :root {
-  /* Kerala Inspired Palette */
-  --primary: #D4AF37;
-  --secondary: #FDF5E6;
-  --accent: #800000;
-  --background: #FCFAFA;
-  --foreground: #1A1A1A;
-  --gold-gradient: linear-gradient(135deg, #D4AF37 0%, #FDF5E6 50%, #D4AF37 100%);
-  --glass: rgba(255, 255, 255, 0.8);
-  --glass-border: rgba(212, 175, 55, 0.2);
+  --background: #ffffff;
+  --foreground: #171717;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0F0F0F;
-    --foreground: #F5F5F5;
-    --glass: rgba(15, 15, 15, 0.8);
-    --glass-border: rgba(212, 175, 55, 0.3);
-  }
+@theme {
+  --color-accent: #3b82f6;
 }
 
 body {
-  color: var(--foreground);
   background: var(--background);
-  font-family: 'Outfit', sans-serif;
-  @apply antialiased;
+  color: var(--foreground);
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
 }
 
-@utility glass-morphism {
-  background: var(--glass);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--glass-border);
+.animate-reveal {
+  opacity: 0;
+  transform: translateY(20px);
 }
-
-@utility kasavu-border {
-  border-bottom: 3px solid transparent;
-  border-image: linear-gradient(to right, var(--primary), var(--secondary), var(--primary)) 1;
-}
-
-@utility gold-text {
-  background: var(--gold-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-weight: 700;
-}
-
-
-
-
-

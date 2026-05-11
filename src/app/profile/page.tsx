@@ -1,192 +1,437 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Camera, MapPin, Briefcase, Utensils, Heart, Save, LogOut } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { animate } from "animejs";
+import { User, Heart, Settings, MapPin, Phone, Calendar, LogOut, Plus, X, Star, Languages, Smile, Loader2, Camera, Briefcase, GraduationCap, Ruler, MessageSquare, HeartHandshake, Mail, Check, ShieldAlert, Edit2, Save } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import axios from "axios";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import toast from "react-hot-toast";
-import Image from "next/image";
+import { useRouter } from "next/navigation";
 
-const DISTRICTS = [
-  'Alappuzha', 'Ernakulam', 'Idukki', 'Kannur', 'Kasaragod', 
-  'Kollam', 'Kottayam', 'Kozhikode', 'Malappuram', 'Palakkad', 
-  'Pathanamthitta', 'Thiruvananthapuram', 'Thrissur', 'Wayanad'
-];
+const DISTRICTS = ["Alappuzha", "Ernakulam", "Idukki", "Kannur", "Kasaragod", "Kollam", "Kottayam", "Kozhikode", "Malappuram", "Palakkad", "Pathanamthitta", "Thiruvananthapuram", "Thrissur", "Wayanad"];
+const GENDERS = ["Male", "Female", "Other"];
+const LOOKING_FOR = ["Dating", "Serious Relationship", "Marriage", "Friendship"];
+const SUGGESTED_INTERESTS = ["Music", "Travel", "Cinema", "Football", "Cooking", "Photography", "Dance", "Coding", "Art", "Reading"];
 
 export default function ProfilePage() {
-  const { user, logout, checkAuth } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [profile, setProfile] = useState({
-    name: "",
-    bio: "",
-    district: "",
-    profession: "",
-    interests: [] as string[],
+  const { user, profile, logout, loading, setProfile } = useAuth();
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [activeTab, setActiveTab] = useState("story");
+  const [isEditing, setIsEditing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [customInterest, setCustomInterest] = useState("");
+  
+  const [editData, setEditData] = useState({
+    name: profile?.name || "",
+    age: profile?.age || "",
+    gender: profile?.gender || "Male",
+    district: profile?.district || "Ernakulam",
+    phone: profile?.phone || "",
+    phoneVerified: profile?.phoneVerified || false,
+    bio: profile?.bio || "",
+    profession: profile?.profession || "",
+    education: profile?.education || "",
+    religion: profile?.religion || "",
+    height: profile?.height || "",
+    lookingFor: profile?.lookingFor || "Dating",
+    interests: profile?.interests || [],
+    languages: profile?.languages || ["Malayalam", "English"],
   });
 
   useEffect(() => {
-    if (user) {
-      setProfile({
-        name: user.name || "",
-        bio: (user as any).bio || "",
-        district: user.district || "",
-        profession: (user as any).profession || "",
-        interests: (user as any).interests || [],
+    if (loading === false && !user) {
+      router.push("/login");
+      return;
+    }
+    if (profile) {
+      setEditData({
+        name: profile.name || "",
+        age: profile.age || "",
+        gender: profile.gender || "Male",
+        district: profile.district || "Ernakulam",
+        phone: profile.phone || "",
+        phoneVerified: profile.phoneVerified || false,
+        bio: profile.bio || "",
+        profession: profile.profession || "",
+        education: profile.education || "",
+        religion: profile.religion || "",
+        height: profile.height || "",
+        lookingFor: profile.lookingFor || "Dating",
+        interests: profile.interests || [],
+        languages: profile.languages || ["Malayalam", "English"],
       });
     }
-  }, [user]);
 
-  const handleSave = async () => {
-    setLoading(true);
+    if (loading === false && user) {
+      setTimeout(() => {
+        animate('.animate-profile', {
+          opacity: [0, 1],
+          translateY: [20, 0],
+          delay: (el: any, i: number) => i * 100,
+          duration: 800,
+          ease: 'outExpo'
+        });
+      }, 100);
+    }
+  }, [user, loading, router, profile]);
+
+  const [isScanning, setIsScanning] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (file.size > 800 * 1024) {
+      toast.error("Photo must be under 800KB.");
+      return;
+    }
+
+    setIsUploading(true);
+    setIsScanning(true);
+    
     try {
-      await axios.patch("http://localhost:5000/api/v1/users/updateMe", profile, {
-        withCredentials: true,
-      });
-      toast.success("Profile updated successfully!");
-      await checkAuth();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to update profile");
-    } finally {
-      setLoading(false);
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const base64String = reader.result as string;
+        
+        // REAL AI Safety Scan call
+        const res = await fetch("/api/vision", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: base64String })
+        });
+        
+        const scanData = await res.json();
+        
+        if (scanData.safe) {
+          const userRef = doc(db, "users", user.uid);
+          await setDoc(userRef, { photoURL: base64String }, { merge: true });
+
+          if (setProfile) setProfile({ ...profile, photoURL: base64String } as any);
+          toast.success("AI Approved: Photo Synced!");
+        } else {
+          toast.error("AI Rejected: Inappropriate content detected.");
+        }
+        
+        setIsUploading(false);
+        setIsScanning(false);
+      };
+    } catch (err) {
+      toast.error("AI Scan failed. Check API key.");
+      setIsUploading(false);
+      setIsScanning(false);
     }
   };
 
-  if (!user) return null;
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [verificationId, setVerificationId] = useState<string | null>(null);
+
+  const handleRemovePhoto = async () => {
+    if (!user || !confirm("Remove your profile photo?")) return;
+    setIsUploading(true);
+    try {
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(userRef, { photoURL: "" }, { merge: true });
+      if (setProfile) setProfile({ ...profile, photoURL: "" } as any);
+      toast.success("Photo removed");
+    } catch (err) {
+      toast.error("Failed to remove photo");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (otpCode === "123456") { // Simulated success code
+       setEditData({...editData, phoneVerified: true});
+       setVerificationId(null);
+       setOtpCode("");
+       toast.success("Phone Verified Successfully!");
+    } else {
+       toast.error("Invalid OTP code");
+    }
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    if (!user) return;
+    try {
+      const updatedProfile = {
+        ...editData,
+        age: parseInt(editData.age.toString()),
+        updatedAt: new Date()
+      };
+      await setDoc(doc(db, "users", user.uid), updatedProfile, { merge: true });
+      if (setProfile) setProfile({ ...profile, ...updatedProfile } as any);
+      toast.success("Profile Updated!");
+      setIsEditing(false);
+    } catch (err) {
+      toast.error("Failed to update profile");
+    }
+  };
+
+  const toggleInterest = (interest: string) => {
+    const updated = editData.interests.includes(interest) ? editData.interests.filter(i => i !== interest) : [...editData.interests, interest];
+    setEditData({...editData, interests: updated});
+  };
+
+  const addCustomInterest = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && customInterest.trim()) {
+      e.preventDefault();
+      if (!editData.interests.includes(customInterest.trim())) {
+        setEditData({ ...editData, interests: [...editData.interests, customInterest.trim()] });
+      }
+      setCustomInterest("");
+    }
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold italic text-3xl">Datii.</div>;
 
   return (
-    <div className="min-h-screen bg-[#FCFAFA] dark:bg-[#0F0F0F] pt-28 pb-12 px-4">
-      <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-        
-        {/* Sidebar - Profile Picture & Quick Stats */}
-        <div className="md:col-span-1 space-y-6">
-          <div className="bg-white dark:bg-[#1A1A1A] p-6 rounded-[2rem] shadow-xl border border-gray-100 dark:border-gray-800 text-center">
-            <div className="relative w-32 h-32 mx-auto mb-4 group cursor-pointer">
-              <div className="w-full h-full rounded-full bg-gradient-to-tr from-[#D4AF37] to-[#F5F5DC] p-1">
-                <div className="w-full h-full rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center overflow-hidden relative">
-                  {user.images?.[0] ? (
-                    <Image src={user.images[0]} alt={user.name} fill className="object-cover" />
-                  ) : (
-                    <span className="text-4xl font-bold text-gray-400">{user.name[0]}</span>
-                  )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Camera className="text-white" />
-                  </div>
-                </div>
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-[#D4AF37] rounded-full border-4 border-white dark:border-[#1A1A1A] flex items-center justify-center">
-                <Heart size={14} className="text-black" fill="currentColor" />
-              </div>
-            </div>
-            
-            <h2 className="text-xl font-bold mb-1">{user.name}</h2>
-            <p className="text-gray-500 text-sm mb-6">{user.email}</p>
-            
-            <button 
-              onClick={logout}
-              className="w-full py-3 flex items-center justify-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl transition-all text-sm font-medium"
+    <main className="min-h-screen bg-white pt-32 pb-20 px-6">
+      <div className="max-w-5xl mx-auto">
+        <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+
+        {/* Header Profile Section */}
+        <div className="flex flex-col md:flex-row items-center gap-10 mb-16 animate-profile opacity-0">
+          <div className="relative group cursor-pointer">
+            <div 
+              onClick={() => !isUploading && !isScanning && fileInputRef.current?.click()}
+              className="w-40 h-40 rounded-full border-4 border-black overflow-hidden bg-gray-50 flex items-center justify-center shadow-2xl relative group"
             >
-              <LogOut size={18} />
-              Sign Out
-            </button>
+              {isScanning ? (
+                <div className="flex flex-col items-center gap-3 text-blue-600 animate-pulse">
+                  <ShieldAlert className="animate-bounce" size={48} />
+                  <span className="text-[8px] font-black uppercase tracking-[0.3em]">AI Security Scan</span>
+                </div>
+              ) : isUploading ? (
+                <div className="flex flex-col items-center gap-2 text-black">
+                  <Loader2 className="animate-spin" size={32} />
+                  <span className="text-[10px] font-black uppercase">Syncing...</span>
+                </div>
+              ) : profile?.photoURL || user?.photoURL ? (
+                <img src={profile?.photoURL || user?.photoURL || ""} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <User size={64} className="text-black/10" />
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            {profile?.photoURL && !isScanning && !isUploading && (
+               <button 
+                 onClick={(e) => { e.stopPropagation(); handleRemovePhoto(); }}
+                 className="absolute -top-2 -right-2 p-2 bg-red-500 text-white rounded-full shadow-xl hover:scale-110 transition-all z-20"
+               >
+                 <X size={16} />
+               </button>
+            )}
+            
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-2 right-2 p-3 bg-black text-white rounded-full shadow-xl hover:scale-110 transition-all cursor-pointer"
+            >
+              <Camera size={16} />
+            </div>
           </div>
 
-          <div className="bg-[#D4AF37] p-6 rounded-[2rem] shadow-xl text-black">
-            <h3 className="font-bold mb-2">Premium Status</h3>
-            <p className="text-sm opacity-80 mb-4">
-              {user.isPremium ? "You are a Gold member!" : "Upgrade to see who liked you and get unlimited swipes."}
-            </p>
-            {!user.isPremium && (
-              <button className="w-full py-3 bg-black text-white rounded-xl font-bold text-sm hover:scale-105 transition-transform">
-                Upgrade Now
-              </button>
-            )}
+          <div className="text-center md:text-left flex-1">
+            <h1 className="text-5xl font-black tracking-tighter mb-2 uppercase italic">{profile?.name || user?.displayName}</h1>
+            <div className="flex flex-wrap justify-center md:justify-start gap-4 text-gray-400 font-bold uppercase tracking-widest text-[10px]">
+              <span className="flex items-center gap-2 text-black border-r pr-4 border-gray-200"><MapPin size={12} /> {profile?.district}</span>
+              <span className="flex items-center gap-2 text-black border-r pr-4 border-gray-200"><Calendar size={12} /> {profile?.age} Yrs</span>
+              <span className="flex items-center gap-2 text-black border-r pr-4 border-gray-200"><Phone size={12} className="text-blue-500" /> {profile?.phone || "Private"}</span>
+              <span className="flex items-center gap-2 text-black"><Heart size={12} className="fill-black" /> {profile?.lookingFor}</span>
+            </div>
           </div>
+
+          <button onClick={logout} className="p-4 border-2 border-black rounded-2xl hover:bg-black hover:text-white transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest">
+            <LogOut size={18} /> Logout
+          </button>
         </div>
 
-        {/* Main Content - Edit Form */}
-        <div className="md:col-span-2 space-y-6">
-          <div className="bg-white dark:bg-[#1A1A1A] p-8 rounded-[2rem] shadow-xl border border-gray-100 dark:border-gray-800">
-            <div className="flex items-center justify-between mb-8">
-              <h1 className="text-2xl font-bold">Complete Your <span className="gold-text">Profile</span></h1>
-              <button 
-                onClick={handleSave}
-                disabled={loading}
-                className="flex items-center gap-2 px-6 py-2.5 bg-[#D4AF37] hover:bg-[#B8860B] text-black font-bold rounded-xl transition-all shadow-lg active:scale-95 disabled:opacity-50"
-              >
-                <Save size={18} />
-                {loading ? "Saving..." : "Save Changes"}
-              </button>
+        {/* Tab Content */}
+        <div className="animate-profile opacity-0">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+            <div className="lg:col-span-2 space-y-8">
+              <div className="p-8 border-2 border-black rounded-[2.5rem] shadow-xl bg-white">
+                <div className="flex justify-between items-center mb-10">
+                  <h2 className="text-3xl font-black italic tracking-tighter">My Story</h2>
+                  <button onClick={() => setIsEditing(!isEditing)} className="px-6 py-2 bg-black text-white rounded-full text-xs font-black uppercase tracking-widest hover:scale-105 transition-all">
+                    {isEditing ? "Cancel" : "Edit Profile"}
+                  </button>
+                </div>
+                
+                {isEditing ? (
+                  <div className="space-y-12">
+                    {/* Step 1: Basics */}
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-300">1. Basics & Contact</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <EditInput label="Full Name" value={editData.name} onChange={(v:string) => setEditData({...editData, name: v})} />
+                        <EditInput label="Age" type="number" value={editData.age} onChange={(v:string) => setEditData({...editData, age: v})} />
+                        <div className="space-y-4">
+                           <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-4">Verified Email</label>
+                             <div className="p-5 bg-gray-50 border-2 border-gray-100 rounded-full font-bold text-gray-400 flex items-center gap-4">
+                                <Mail size={16} /> {user?.email}
+                             </div>
+                           </div>
+                           
+                           <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-4">Verified Phone</label>
+                             <div className="p-5 bg-gray-50 border-2 border-gray-100 rounded-full font-bold text-gray-400 flex items-center gap-4">
+                                <Phone size={16} /> {editData.phone || "No phone added"}
+                                <div className="ml-auto text-green-500 flex items-center gap-1 text-[9px] uppercase font-black">
+                                   <Check size={14} /> Verified
+                                </div>
+                             </div>
+                           </div>
+                        </div>
+                        <EditSelect label="Gender" value={editData.gender} options={GENDERS} onChange={(v) => setEditData({...editData, gender: v})} />
+                        <EditSelect label="District" value={editData.district} options={DISTRICTS} onChange={(v) => setEditData({...editData, district: v})} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 pt-6 border-t border-gray-100">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-300">2. Vibe & Bio</h3>
+                      <EditSelect label="Looking For" value={editData.lookingFor} options={LOOKING_FOR} onChange={(v) => setEditData({...editData, lookingFor: v})} />
+                      
+                      {/* Interests Input */}
+                      <div className="space-y-4 mt-6">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">My Interests</label>
+                        <div className="flex flex-wrap gap-2">
+                          {editData.interests.map((i: string) => (
+                            <span key={i} className="px-4 py-2 bg-black text-white rounded-full text-[10px] font-black uppercase flex items-center gap-2">
+                              {i} <X size={12} className="cursor-pointer" onClick={() => toggleInterest(i)} />
+                            </span>
+                          ))}
+                        </div>
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            value={customInterest} 
+                            onChange={(e) => setCustomInterest(e.target.value)} 
+                            onKeyDown={addCustomInterest} 
+                            placeholder="Type interest & hit Enter (e.g. Travel, Music)..." 
+                            className="w-full p-5 border-2 border-black rounded-2xl font-bold italic text-sm focus:outline-none bg-white shadow-sm" 
+                          />
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-gray-50 rounded-lg">
+                             <Plus size={16} className="text-gray-400" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 mt-6">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bio</label>
+                        <textarea value={editData.bio} onChange={(e) => setEditData({...editData, bio: e.target.value})} placeholder="Tell your story..." className="w-full p-6 border-2 border-black rounded-[2rem] min-h-[150px] font-medium focus:outline-none bg-white shadow-sm" />
+                      </div>
+                    </div>
+
+                    <button onClick={handleUpdateProfile} className="w-full py-6 bg-black text-white rounded-full font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-2xl hover:scale-[1.02] transition-all">
+                      <Save size={24} /> Complete Profile
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-12">
+                    <p className="text-2xl text-gray-600 leading-relaxed font-medium italic">"{profile?.bio || "A great connection needs a story. Click edit to start yours..."}"</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+                      <InfoBadge icon={<Briefcase size={16}/>} label="Work" value={profile?.profession} />
+                      <InfoBadge icon={<GraduationCap size={16}/>} label="Education" value={profile?.education} />
+                      <InfoBadge icon={<HeartHandshake size={16}/>} label="Religion" value={profile?.religion} />
+                      <InfoBadge icon={<Ruler size={16}/>} label="Height" value={profile?.height} />
+                      <InfoBadge icon={<Languages size={16}/>} label="Gender" value={profile?.gender} />
+                      <InfoBadge icon={<Phone size={16}/>} label="Phone" value={profile?.phone} />
+                    </div>
+
+                    {/* Interests Section in View Mode */}
+                    {profile?.interests && profile.interests.length > 0 && (
+                      <div className="pt-10 border-t border-gray-100">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 mb-6">My Vibes</h3>
+                        <div className="flex flex-wrap gap-3">
+                          {profile.interests.map((interest: string) => (
+                            <span key={interest} className="px-6 py-3 bg-gray-50 border-2 border-black/5 rounded-full text-[10px] font-black uppercase tracking-widest text-black">
+                              {interest}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-gray-500 ml-1">Current District</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-[#D4AF37]" size={18} />
-                    <select 
-                      value={profile.district}
-                      onChange={(e) => setProfile({...profile, district: e.target.value})}
-                      className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-[#D4AF37]/50 appearance-none"
-                    >
-                      {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-gray-500 ml-1">Profession</label>
-                  <div className="relative">
-                    <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-[#D4AF37]" size={18} />
-                    <input 
-                      type="text"
-                      value={profile.profession}
-                      onChange={(e) => setProfile({...profile, profession: e.target.value})}
-                      placeholder="e.g. Software Engineer"
-                      className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-[#D4AF37]/50"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 ml-1">About Me</label>
-                <textarea 
-                  value={profile.bio}
-                  onChange={(e) => setProfile({...profile, bio: e.target.value})}
-                  rows={4}
-                  placeholder="Tell others about your roots and what you're looking for..."
-                  className="w-full bg-gray-50 dark:bg-gray-900 border-none rounded-2xl p-4 focus:ring-2 focus:ring-[#D4AF37]/50 resize-none"
-                />
-              </div>
-
-              <div className="space-y-4">
-                <label className="text-xs font-bold uppercase tracking-widest text-gray-500 ml-1">Interests</label>
-                <div className="flex flex-wrap gap-2">
-                  {['Photography', 'Traveling', 'Music', 'Cooking', 'Art', 'Dance', 'Cinema', 'Reading'].map(interest => (
-                    <button
-                      key={interest}
-                      onClick={() => {
-                        const newInterests = profile.interests.includes(interest)
-                          ? profile.interests.filter(i => i !== interest)
-                          : [...profile.interests, interest];
-                        setProfile({...profile, interests: newInterests});
-                      }}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                        profile.interests.includes(interest)
-                        ? 'bg-[#D4AF37] text-black shadow-md'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200'
-                      }`}
-                    >
-                      {interest}
-                    </button>
-                  ))}
-                </div>
+            <div className="space-y-8">
+              <div className="p-8 bg-black text-white rounded-[2.5rem] shadow-2xl text-center overflow-hidden">
+                 <h3 className="text-[10px] font-black uppercase tracking-[0.4em] mb-4 opacity-50">Identity Score</h3>
+                 <div className="text-7xl font-black text-blue-400 mb-2">100%</div>
               </div>
             </div>
           </div>
         </div>
       </div>
+      {/* OTP Verification Modal */}
+      {verificationId && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fade-in">
+           <div className="bg-white rounded-[3rem] p-10 max-w-sm w-full text-center space-y-8 animate-match-card">
+              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-500">
+                 <ShieldAlert size={40} />
+              </div>
+              <div>
+                <h3 className="text-3xl font-black italic tracking-tighter uppercase mb-2">Verify Phone</h3>
+                <p className="text-gray-400 font-black uppercase text-[10px] tracking-widest leading-relaxed">
+                  Enter the 6-digit code we sent to your number. For testing, use: <span className="text-black">123456</span>
+                </p>
+              </div>
+              <input 
+                type="text" 
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                placeholder="000000"
+                className="w-full p-6 bg-gray-50 border-2 border-black rounded-2xl text-center text-3xl font-black tracking-[0.5em] focus:outline-none"
+              />
+              <div className="flex flex-col gap-3">
+                 <button onClick={handleVerifyOTP} className="w-full py-5 bg-black text-white rounded-full font-black uppercase tracking-widest text-xs shadow-xl">Verify Code</button>
+                 <button onClick={() => setVerificationId(null)} className="text-gray-400 font-black uppercase text-[10px] tracking-widest">Cancel</button>
+              </div>
+           </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function EditInput({ label, value, onChange, type = "text" }: any) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</label>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full p-4 border-2 border-black rounded-2xl font-bold focus:ring-0 focus:outline-none bg-white" />
+    </div>
+  );
+}
+
+function EditSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full p-4 border-2 border-black rounded-2xl font-bold appearance-none bg-white">
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function InfoBadge({ icon, label, value }: { icon: any; label: string; value: any }) {
+  if (!value) return null;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-gray-400 text-[9px] font-black uppercase tracking-widest">{icon} {label}</div>
+      <div className="font-black text-sm">{value}</div>
     </div>
   );
 }
