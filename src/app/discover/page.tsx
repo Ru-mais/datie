@@ -169,16 +169,37 @@ export default function DiscoverPage() {
                <User size={48} className="text-gray-200" />
                <div className="absolute inset-0 rounded-full border-2 border-gray-100 animate-ping opacity-20" />
             </div>
-            <h2 className="text-4xl font-black tracking-tighter uppercase italic mb-4">You&apos;re our First Member!</h2>
-            <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-[10px] mb-10 max-w-xs mx-auto leading-loose">
-              Welcome to Datii. There aren&apos;t any other profiles yet. Why not invite some friends to start the connection?
-            </p>
-            <button 
-              onClick={() => router.push("/profile")}
-              className="px-12 py-5 border-2 border-black rounded-full font-black uppercase tracking-widest text-xs hover:bg-black hover:text-white transition-all shadow-xl"
-            >
-              Complete Your Profile
-            </button>
+            
+            {allUsers.length === 0 ? (
+              <>
+                <h2 className="text-4xl font-black tracking-tighter uppercase italic mb-4">You&apos;re our First Member!</h2>
+                <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-[10px] mb-10 max-w-xs mx-auto leading-loose">
+                  Welcome to Datie. There aren&apos;t any other profiles yet. Why not invite some friends to start the connection?
+                </p>
+                <button 
+                  onClick={() => router.push("/profile")}
+                  className="px-12 py-5 border-2 border-black rounded-full font-black uppercase tracking-widest text-xs hover:bg-black hover:text-white transition-all shadow-xl"
+                >
+                  Complete Your Profile
+                </button>
+              </>
+            ) : (
+              <>
+                <h2 className="text-4xl font-black tracking-tighter uppercase italic mb-4">No Profiles Found</h2>
+                <p className="text-gray-400 font-bold uppercase tracking-[0.2em] text-[10px] mb-10 max-w-xs mx-auto leading-loose">
+                  We couldn&apos;t find anyone matching your current filters. Try expanding your search range or changing your preferences!
+                </p>
+                <button 
+                  onClick={() => {
+                    setFilters({ district: "All", gender: "All", minAge: 18, maxAge: 50, religion: "" });
+                    setFilteredUsers(allUsers);
+                  }}
+                  className="px-12 py-5 bg-black text-white rounded-full font-black uppercase tracking-widest text-xs hover:scale-105 transition-all shadow-xl"
+                >
+                  Clear All Filters
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
