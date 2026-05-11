@@ -5,8 +5,11 @@ import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
-  title: "Datie. | Find Your Spark in Kerala",
-  description: "The most exclusive space for the Malayali community to find meaningful connections.",
+  title: "Datie. | The Elite Malayali Dating Protocol",
+  description: "Secure, Verified, and AI-Powered connections for the premium Malayali community.",
+  icons: {
+    icon: "/favicon.ico",
+  }
 };
 
 export default function RootLayout({
