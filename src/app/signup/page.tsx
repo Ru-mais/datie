@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { auth, db } from "@/lib/firebase";
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 import toast from "react-hot-toast";
 
 const DISTRICTS = [
@@ -30,13 +31,19 @@ export default function SignupPage() {
   
   const [step, setStep] = useState(1); // 1: Form, 2: OTP
   const [otp, setOtp] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     if (user && mounted) router.push("/discover");
+
+    if (typeof window !== "undefined" && !(window as any).recaptchaVerifier) {
+      (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-signup', {
+        'size': 'invisible'
+      });
+    }
 
     animate('.animate-signup', {
       opacity: [0, 1],
@@ -45,7 +52,7 @@ export default function SignupPage() {
       duration: 1000,
       ease: 'outExpo'
     });
-  }, [user, router]);
+  }, [user, router, mounted]);
 
   const handleStartSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,33 +60,16 @@ export default function SignupPage() {
     
     setIsSubmitting(true);
     try {
-      // DATIE CUSTOM OTP ENGINE: Generate a secure 6-digit code internally
-      const mockCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedOtp(mockCode);
+      const appVerifier = (window as any).recaptchaVerifier;
+      const formatPhone = formData.phone.startsWith("+") ? formData.phone : `+91${formData.phone}`;
       
-      // Call our secure backend API to send the REAL SMS
-      const res = await fetch("/api/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: formData.phone, code: mockCode })
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        toast.success(`OTP sent successfully to ${formData.phone}`, { icon: '📱' });
-      } else {
-        // Elite Fallback: If API key is missing during testing, show the code
-        toast.error(`Gateway: ${data.error}. Testing Code: ${mockCode}`, { 
-          duration: 10000,
-          icon: '⚠️'
-        });
-      }
-      
+      const result = await signInWithPhoneNumber(auth, formatPhone, appVerifier);
+      setConfirmationResult(result);
       setStep(2);
+      toast.success("OTP sent to " + formatPhone);
     } catch (err: any) {
       console.error(err);
-      toast.error("Signup system encountered an error. Please try again.");
+      toast.error(err.message || "SMS failed. Check Firebase Billing.");
     } finally {
       setIsSubmitting(false);
     }
@@ -87,27 +77,40 @@ export default function SignupPage() {
 
   const handleVerifyAndCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!generatedOtp || otp.length < 6) return toast.error("Enter 6-digit code");
-
-    if (otp !== generatedOtp) {
-      return toast.error("Invalid verification code. Please check and try again.");
-    }
+    if (!confirmationResult || otp.length < 6) return toast.error("Enter 6-digit code");
 
     setIsSubmitting(true);
     try {
-      // Create account using the unified email system
-      await signupWithEmail(formData.email, formData.password, formData.name, {
+      // 1. Verify the OTP (This logs them in via Phone)
+      const credential = await confirmationResult.confirm(otp);
+      const phoneUser = credential.user;
+
+      // 2. Link Email & Password to this Phone User
+      const { linkWithCredential, EmailAuthProvider, updateProfile } = await import("firebase/auth");
+      const emailCred = EmailAuthProvider.credential(formData.email, formData.password);
+      
+      await linkWithCredential(phoneUser, emailCred);
+      
+      // 3. Set Display Name
+      await updateProfile(phoneUser, { displayName: formData.name });
+
+      // 4. Create Firestore Profile
+      const { setDoc, doc } = await import("firebase/firestore");
+      await setDoc(doc(db, "users", phoneUser.uid), {
+        name: formData.name,
+        email: formData.email,
         age: parseInt(formData.age),
         phone: formData.phone,
         phoneVerified: true,
-        district: formData.district
+        district: formData.district,
+        createdAt: new Date().toISOString()
       });
       
       toast.success("Identity Verified! Welcome to Datie.");
       router.push("/discover");
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Signup failed. Account may already exist.");
+      toast.error(err.message || "Invalid OTP or Linking failed");
     } finally {
       setIsSubmitting(false);
     }
