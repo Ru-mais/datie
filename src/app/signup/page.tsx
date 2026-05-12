@@ -57,11 +57,24 @@ export default function SignupPage() {
       const mockCode = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(mockCode);
       
-      // Simulate sending SMS with a professional notification
-      toast.success(`Datie. Security: Your verification code is ${mockCode}`, {
-        duration: 10000,
-        icon: '🛡️'
+      // Call our secure backend API to send the REAL SMS via Textbee
+      const res = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: formData.phone, code: mockCode })
       });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(`OTP sent to ${formData.phone} via your Android Gateway!`, { icon: '📱' });
+      } else {
+        // Elite Fallback: If API key is missing during testing, show the code
+        toast.error(`Textbee Setup: ${data.error}. Testing Code: ${mockCode}`, { 
+          duration: 10000,
+          icon: '⚠️'
+        });
+      }
       
       setStep(2);
     } catch (err: any) {
@@ -102,8 +115,6 @@ export default function SignupPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-white px-6 pt-32 pb-20 relative overflow-hidden">
       
-      <div id="recaptcha-signup"></div>
-
       <div className="w-full max-w-xl p-10 border-2 border-black rounded-[3rem] shadow-2xl animate-signup opacity-0 bg-white z-10">
         <div className="text-center mb-10 space-y-2">
            <h1 className="text-6xl font-black tracking-tighter italic uppercase leading-tight">Datie.</h1>
