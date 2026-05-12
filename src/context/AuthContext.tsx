@@ -62,14 +62,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (docSnap.exists()) {
             setProfile(docSnap.data() as UserProfile);
           } else {
-            // Create a basic profile if it's missing
-            const basicProfile = {
-              uid: firebaseUser.uid,
-              name: firebaseUser.displayName || "New User",
-              email: firebaseUser.email || "",
-              createdAt: new Date()
-            };
-            setProfile(basicProfile as UserProfile);
+            // Check if this is a brand new user (created within the last 5 minutes)
+            const creationTime = new Date(firebaseUser.metadata.creationTime || "").getTime();
+            const isNewUser = Date.now() - creationTime < 300000;
+
+            if (isNewUser) {
+              // Create a basic profile if it's genuinely a new signup missing data
+              const basicProfile = {
+                uid: firebaseUser.uid,
+                name: firebaseUser.displayName || "New User",
+                email: firebaseUser.email || "",
+                createdAt: new Date()
+              };
+              setProfile(basicProfile as UserProfile);
+            } else {
+              // If the user is old but has no Firestore doc, they were DELETED by an Admin!
+              console.warn("Account purged by Admin. Triggering auto-delete mechanism.");
+              try {
+                const { deleteUser } = await import("firebase/auth");
+                await deleteUser(firebaseUser);
+              } catch (e) {
+                // If deleteUser requires recent re-auth, at least force logout
+                console.error("Could not delete Auth record, forcing logout.", e);
+                await signOut(auth);
+              }
+              setUser(null);
+              setProfile(null);
+            }
           }
         } catch (error) {
           console.error("Firestore Fetch Error (Offline?):", error);
