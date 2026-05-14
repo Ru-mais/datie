@@ -34,12 +34,19 @@ export async function POST(req: Request) {
     if (response.ok) {
       return NextResponse.json({ success: true, message: "OTP Sent successfully via Textbee" });
     } else {
-      const data = await response.json();
-      return NextResponse.json({ error: data.message || "Failed to send SMS via Textbee" }, { status: 400 });
+      const errorText = await response.text();
+      let errorMessage = "Failed to send SMS via Textbee";
+      try {
+        const data = JSON.parse(errorText);
+        errorMessage = data.message || JSON.stringify(data);
+      } catch (e) {
+        errorMessage = errorText;
+      }
+      return NextResponse.json({ error: `Textbee Error: ${errorMessage}` }, { status: 400 });
     }
 
   } catch (error: any) {
     console.error("Textbee Gateway Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: `Server Error: ${error.message}` }, { status: 500 });
   }
 }
