@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     // Format phone: ensure it has a country code (defaults to +91 if missing)
     const formattedPhone = phone.startsWith("+") ? phone : `+91${phone}`;
 
-    const response = await fetch(`https://api.textbee.dev/api/v1/gateway/devices/${DEVICE_ID}/sendSMS`, {
+    const response = await fetch(`https://api.textbee.dev/api/v1/gateway/devices/${DEVICE_ID}/send-sms`, {
       method: "POST",
       headers: {
         "x-api-key": API_KEY,
