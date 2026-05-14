@@ -57,11 +57,24 @@ export default function SignupPage() {
       const mockCode = Math.floor(100000 + Math.random() * 900000).toString();
       setGeneratedOtp(mockCode);
       
-      // Simulate sending SMS with a professional notification
-      toast.success(`Datie. Security: Your verification code is ${mockCode}`, {
-        duration: 10000,
-        icon: '🛡️'
+      // Call our secure backend API to send the REAL SMS via Textbee
+      const res = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: formData.phone, code: mockCode })
       });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(`OTP sent to ${formData.phone} via your Android Gateway!`, { icon: '📱' });
+      } else {
+        // Elite Fallback: If Textbee fails, show the code so they aren't blocked
+        toast.error(`Textbee Setup: ${data.error}. Testing Code: ${mockCode}`, { 
+          duration: 10000,
+          icon: '⚠️'
+        });
+      }
       
       setStep(2);
     } catch (err: any) {
