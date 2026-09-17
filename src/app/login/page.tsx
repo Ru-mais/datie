@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { auth } from "@/lib/firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, ArrowRight, Loader2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
@@ -10,6 +9,7 @@ import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { loginWithEmail } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await loginWithEmail(email, password);
       toast.success("Welcome back to Datie.");
       router.push("/discover");
     } catch (err: any) {

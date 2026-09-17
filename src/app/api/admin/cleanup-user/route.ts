@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, deleteDoc, doc, writeBatch } from "firebase/firestore";
+import { collection, query, where, getDocs, deleteDoc, doc, getDoc, writeBatch } from "firebase/firestore";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
     const { uid, adminSecret } = await req.json();
 
-    // Security Check: Match the dashboard's master key
-    if (adminSecret !== process.env.NEXT_PUBLIC_ADMIN_KEY) {
+    // Security Check: Match the server-side admin key
+    if (adminSecret !== process.env.ADMIN_KEY) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
@@ -57,8 +59,19 @@ export async function POST(req: Request) {
     receivedBlocks.docs.forEach(d => blocksBatch.delete(d.ref));
     await blocksBatch.commit();
 
-    // 4. Delete the USER Profile
-    await deleteDoc(doc(db, "users", uid));
+    // 4. Get USER email first to purge their credentials
+    const userDocRef = doc(db, "users", uid);
+    const userDocSnap = await getDoc(userDocRef);
+    if (userDocSnap.exists()) {
+      const userData = userDocSnap.data();
+      if (userData.email) {
+        const authDocRef = doc(db, "users_auth", userData.email.toLowerCase().trim());
+        await deleteDoc(authDocRef);
+      }
+    }
+
+    // 5. Delete the USER Profile
+    await deleteDoc(userDocRef);
 
     return NextResponse.json({ 
       success: true, 

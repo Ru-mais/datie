@@ -1,17 +1,16 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { auth, db } from "@/lib/firebase";
 import { 
   onAuthStateChanged, 
-  signInWithPopup, 
-  signOut, 
-  User,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updateProfile
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut,
+  sendEmailVerification
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
-import { auth, googleProvider, db } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import toast from "react-hot-toast";
 
 interface UserProfile {
   uid: string;
@@ -34,8 +33,16 @@ interface UserProfile {
   vibe?: string[];
 }
 
+interface CustomUser {
+  uid: string;
+  email: string;
+  displayName?: string;
+  photoURL?: string;
+  emailVerified: boolean;
+}
+
 interface AuthContextType {
-  user: User | null;
+  user: CustomUser | null;
   profile: UserProfile | null;
   loading: boolean;
   loginWithGoogle: () => Promise<void>;
@@ -48,81 +55,46 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<CustomUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
       if (firebaseUser) {
+        const customUser: CustomUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          displayName: firebaseUser.displayName || undefined,
+          photoURL: firebaseUser.photoURL || undefined,
+          emailVerified: firebaseUser.emailVerified
+        };
+        setUser(customUser);
+        
+        // Fetch profile from Firestore
         try {
-          const docRef = doc(db, "users", firebaseUser.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            setProfile(docSnap.data() as UserProfile);
+          const profileDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (profileDoc.exists()) {
+            setProfile(profileDoc.data() as UserProfile);
           } else {
-            // Check if this is a brand new user (created within the last 5 minutes)
-            const creationTime = new Date(firebaseUser.metadata.creationTime || "").getTime();
-            const isNewUser = Date.now() - creationTime < 300000;
-
-            if (isNewUser) {
-              // Create a basic profile if it's genuinely a new signup missing data
-              const basicProfile = {
-                uid: firebaseUser.uid,
-                name: firebaseUser.displayName || "New User",
-                email: firebaseUser.email || "",
-                createdAt: new Date()
-              };
-              setProfile(basicProfile as UserProfile);
-            } else {
-              // If the user is old but has no Firestore doc, they were DELETED by an Admin!
-              console.warn("Account purged by Admin. Triggering auto-delete mechanism.");
-              try {
-                const { deleteUser } = await import("firebase/auth");
-                await deleteUser(firebaseUser);
-              } catch (e) {
-                // If deleteUser requires recent re-auth, at least force logout
-                console.error("Could not delete Auth record, forcing logout.", e);
-                await signOut(auth);
-              }
-              setUser(null);
-              setProfile(null);
-            }
+            setProfile(null);
           }
         } catch (error) {
-          console.error("Firestore Fetch Error (Offline?):", error);
-          // Don't crash, just show basic info from Auth
-          setProfile({
-            uid: firebaseUser.uid,
-            name: firebaseUser.displayName || "User",
-            email: firebaseUser.email || ""
-          } as UserProfile);
+          console.error("Failed to fetch user profile:", error);
+          setProfile(null);
         }
       } else {
+        setUser(null);
         setProfile(null);
       }
       setLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
   const loginWithGoogle = async () => {
-    const res = await signInWithPopup(auth, googleProvider);
-    if (res.user) {
-      // Save basic profile for Google users if it doesn't exist
-      const docRef = doc(db, "users", res.user.uid);
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) {
-        await setDoc(docRef, {
-          uid: res.user.uid,
-          name: res.user.displayName,
-          email: res.user.email,
-          photoURL: res.user.photoURL,
-          createdAt: new Date()
-        });
-      }
-    }
+    toast.error("Google Sign-In is not currently enabled.");
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
@@ -130,28 +102,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signupWithEmail = async (email: string, pass: string, name: string, extra: Partial<UserProfile>) => {
-    const res = await createUserWithEmailAndPassword(auth, email, pass);
-    if (res.user) {
-      await updateProfile(res.user, { displayName: name });
-      const userProfile = {
-        uid: res.user.uid,
-        name,
-        email,
-        ...extra,
-        createdAt: new Date()
-      };
-      await setDoc(doc(db, "users", res.user.uid), userProfile);
-      setProfile(userProfile as UserProfile);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+    const user = userCredential.user;
+    
+    // Create the profile in Firestore
+    const userProfile: UserProfile = {
+      uid: user.uid,
+      name,
+      email: user.email || email,
+      phoneVerified: true, // matching original behaviour
+      ...extra
+    };
+    
+    await setDoc(doc(db, "users", user.uid), userProfile);
+    
+    // Reserve the phone number
+    if (extra.phone) {
+      await setDoc(doc(db, "used_phones", extra.phone), { uid: user.uid });
     }
+
+    // Send email verification
+    try {
+      await sendEmailVerification(user);
+    } catch (err) {
+      console.error("Failed to send verification email", err);
+    }
+
+    setProfile(userProfile);
   };
 
   const logout = async () => {
-    await signOut(auth);
+    try {
+      await signOut(auth);
+      toast.success("Successfully logged out.");
+    } catch (e) {
+      console.error("Logout request failed:", e);
+      toast.error("Failed to log out.");
+    }
   };
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, loginWithGoogle, loginWithEmail, signupWithEmail, logout, setProfile }}>
-      {children}
+      {loading ? (
+        <div className="min-h-screen flex items-center justify-center bg-white font-black italic text-3xl text-black animate-pulse">
+          Datie.
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 }

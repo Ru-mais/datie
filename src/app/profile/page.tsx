@@ -160,9 +160,10 @@ export default function ProfilePage() {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     if (!user) return;
     try {
+      const parsedAge = parseInt(editData.age.toString());
       const updatedProfile = {
         ...editData,
-        age: parseInt(editData.age.toString()),
+        age: isNaN(parsedAge) ? 18 : parsedAge,
         updatedAt: new Date()
       };
       await setDoc(doc(db, "users", user.uid), updatedProfile, { merge: true });
@@ -170,6 +171,7 @@ export default function ProfilePage() {
       toast.success("Profile Updated!");
       setIsEditing(false);
     } catch (err) {
+      console.error("Profile update error:", err);
       toast.error("Failed to update profile");
     }
   };

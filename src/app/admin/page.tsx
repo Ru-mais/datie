@@ -15,14 +15,22 @@ export default function AdminDashboard() {
   const [isPurging, setIsPurging] = useState<string | null>(null);
 
   // --- Login Logic ---
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would check against a secure env variable
-    if (adminPass === process.env.NEXT_PUBLIC_ADMIN_KEY) {
-       setIsAuthenticated(true);
-       toast.success("Welcome back, Commander.");
-    } else {
-       toast.error("Invalid Administrative Key.");
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminSecret: adminPass }),
+      });
+      if (res.ok) {
+        setIsAuthenticated(true);
+        toast.success("Welcome back, Commander.");
+      } else {
+        toast.error("Invalid Administrative Key.");
+      }
+    } catch {
+      toast.error("System Error.");
     }
   };
 
@@ -62,7 +70,7 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           uid, 
-          adminSecret: process.env.NEXT_PUBLIC_ADMIN_KEY
+          adminSecret: adminPass
         })
       });
 

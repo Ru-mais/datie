@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datii-app
+  labels:
+    app: datii
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: datii
+  template:
+    metadata:
+      labels:
+        app: datii
+    spec:
+      containers:
+      - name: datii-app
+        image: datii-app:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: REDIS_URL
+          value: "redis://datii-redis:6379"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datii-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: datii-redis
+  template:
+    metadata:
+      labels:
+        app: datii-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:alpine
+        ports:
+        - containerPort: 6379
