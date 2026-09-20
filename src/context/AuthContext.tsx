@@ -63,25 +63,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const customUser: CustomUser = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || "",
-          displayName: firebaseUser.displayName || undefined,
-          photoURL: firebaseUser.photoURL || undefined,
-          emailVerified: firebaseUser.emailVerified
-        };
-        setUser(customUser);
-        
         // Fetch profile from Firestore
         try {
           const profileDoc = await getDoc(doc(db, "users", firebaseUser.uid));
           if (profileDoc.exists()) {
+            const customUser: CustomUser = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              displayName: firebaseUser.displayName || undefined,
+              photoURL: firebaseUser.photoURL || undefined,
+              emailVerified: firebaseUser.emailVerified
+            };
+            setUser(customUser);
             setProfile(profileDoc.data() as UserProfile);
           } else {
+            // Profile document does not exist (account purged). Auto log out.
+            await signOut(auth);
+            setUser(null);
             setProfile(null);
           }
         } catch (error) {
           console.error("Failed to fetch user profile:", error);
+          setUser(null);
           setProfile(null);
         }
       } else {
@@ -99,7 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
-    await signInWithEmailAndPassword(auth, email, pass);
+    const cred = await signInWithEmailAndPassword(auth, email, pass);
+    const profileDoc = await getDoc(doc(db, "users", cred.user.uid));
+    if (!profileDoc.exists()) {
+      await signOut(auth);
+      throw new Error("This account does not exist or has been permanently deleted.");
+    }
+    setProfile(profileDoc.data() as UserProfile);
   };
 
   const signupWithEmail = async (email: string, pass: string, name: string, extra: Partial<UserProfile>) => {

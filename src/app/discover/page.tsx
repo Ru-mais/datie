@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { animate } from "animejs";
-import { Heart, X, MapPin, Search, Filter, Loader2, User, Check, MailCheck } from "lucide-react";
+import { Heart, X, MapPin, Search, Filter, Loader2, User, Check, Sparkles, Camera, ArrowRight, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, getDocs, limit, doc, setDoc, getDoc, serverTimestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -13,13 +13,18 @@ const DISTRICTS = ["All", "Alappuzha", "Ernakulam", "Idukki", "Kannur", "Kasarag
 const GENDERS = ["All", "Male", "Female", "Other"];
 
 export default function DiscoverPage() {
-  const { user, profile, loading, resendVerificationEmail } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
   const [isFetching, setIsFetching] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  const [resending, setResending] = useState(false);
+  const [dismissModal, setDismissModal] = useState(false);
+
+  // Profile completion check
+  const isProfileIncomplete = Boolean(
+    profile && (!profile.photoURL || !profile.bio || !profile.interests || profile.interests.length === 0)
+  );
 
   // Filter States
   const [filters, setFilters] = useState({
@@ -30,12 +35,6 @@ export default function DiscoverPage() {
     religion: ""
   });
   const [matchingWith, setMatchingWith] = useState<any>(null);
-
-  const handleResend = async () => {
-    setResending(true);
-    await resendVerificationEmail();
-    setResending(false);
-  };
 
   const handleLike = async (targetUser: any) => {
     if (!user) return;
@@ -153,6 +152,32 @@ export default function DiscoverPage() {
   return (
     <main className="min-h-screen bg-gray-50/50 pt-32 pb-20 px-6 overflow-hidden relative">
       <div className="max-w-7xl mx-auto">
+
+        {/* Profile Completion Alert Banner */}
+        {isProfileIncomplete && (
+          <div className="mb-8 p-6 bg-gradient-to-r from-black to-neutral-900 text-white border-2 border-black rounded-[2rem] shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-6 animate-card opacity-0">
+            <div className="flex items-center gap-5 text-left">
+              <div className="w-14 h-14 rounded-2xl bg-white text-black flex items-center justify-center shrink-0 shadow-lg">
+                <Sparkles size={28} className="text-black" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-3 py-0.5 bg-yellow-400 text-black text-[9px] font-black uppercase tracking-widest rounded-full">Action Required</span>
+                  <h4 className="font-black uppercase tracking-tight text-sm">Your Profile is Incomplete</h4>
+                </div>
+                <p className="text-gray-300 text-xs font-medium">
+                  Add your photo, bio, and interests to get discovered and receive match requests!
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push("/profile")}
+              className="px-8 py-4 bg-white text-black hover:bg-yellow-400 font-black uppercase tracking-widest text-xs rounded-full hover:scale-105 transition-all shadow-xl shrink-0 flex items-center gap-2"
+            >
+              Complete Profile <ArrowRight size={16} />
+            </button>
+          </div>
+        )}
 
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
           <div className="animate-card opacity-0">
@@ -320,6 +345,70 @@ export default function DiscoverPage() {
               </button>
               <button onClick={() => router.push("/matches")} className="text-white/40 font-black uppercase tracking-widest text-[10px] hover:text-white transition-all py-2">
                 View All Matches
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* First-Login Incomplete Profile Prompt Modal */}
+      {isProfileIncomplete && !dismissModal && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="max-w-md w-full bg-white rounded-[3rem] p-10 shadow-2xl border-2 border-black text-center space-y-6 animate-scale-up">
+            <div className="w-20 h-20 rounded-full bg-black text-white flex items-center justify-center mx-auto shadow-2xl">
+              <Sparkles size={36} className="text-yellow-400 animate-pulse" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="px-4 py-1.5 bg-yellow-400 text-black text-[9px] font-black uppercase tracking-widest rounded-full inline-block">
+                Welcome to Datie
+              </span>
+              <h3 className="text-3xl font-black italic tracking-tighter uppercase">Fill Out Your Profile!</h3>
+              <p className="text-gray-500 text-xs font-medium leading-relaxed">
+                Profiles with photos and bios receive <strong className="text-black font-bold">5x more matches</strong>. Complete yours now to unlock full discovery!
+              </p>
+            </div>
+
+            {/* Checklist */}
+            <div className="bg-gray-50 rounded-2xl p-4 space-y-3 text-left">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="flex items-center gap-2">📸 Profile Photo</span>
+                {profile?.photoURL ? (
+                  <span className="text-green-600 font-black flex items-center gap-1 text-[10px] uppercase">Done <Check size={12} /></span>
+                ) : (
+                  <span className="text-red-500 font-black text-[10px] uppercase">Missing</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="flex items-center gap-2">✍️ About You (Bio)</span>
+                {profile?.bio ? (
+                  <span className="text-green-600 font-black flex items-center gap-1 text-[10px] uppercase">Done <Check size={12} /></span>
+                ) : (
+                  <span className="text-red-500 font-black text-[10px] uppercase">Missing</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="flex items-center gap-2">🎨 Interests & Vibe</span>
+                {profile?.interests && profile.interests.length > 0 ? (
+                  <span className="text-green-600 font-black flex items-center gap-1 text-[10px] uppercase">Done <Check size={12} /></span>
+                ) : (
+                  <span className="text-red-500 font-black text-[10px] uppercase">Missing</span>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <button
+                onClick={() => router.push("/profile")}
+                className="w-full py-5 bg-black text-white hover:bg-neutral-800 rounded-full font-black uppercase tracking-widest text-xs transition-all shadow-xl flex items-center justify-center gap-2 hover:scale-[1.02]"
+              >
+                Complete Profile Now <ArrowRight size={16} />
+              </button>
+              <button
+                onClick={() => setDismissModal(true)}
+                className="text-gray-400 hover:text-black font-black uppercase tracking-widest text-[10px] transition-all py-1"
+              >
+                Explore First, I&apos;ll Fill Later
               </button>
             </div>
           </div>

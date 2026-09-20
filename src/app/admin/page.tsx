@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Trash2, User, Clock, ArrowRight, ShieldCheck, Flag, Users, Search, RefreshCw, AlertTriangle } from "lucide-react";
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, getDocs, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import toast from "react-hot-toast";
 import { animate } from "animejs";
@@ -83,31 +83,63 @@ export default function AdminDashboard() {
     
     setIsPurging(uid);
     try {
-      const res = await fetch("/api/admin/cleanup-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          uid, 
-          adminSecret: adminPass
-        })
-      });
+      // 1. Release used_phones if phone number is present
+      const targetUser = allUsers.find(u => u.uid === uid);
+      if (targetUser?.phone) {
+        try {
+          await deleteDoc(doc(db, "used_phones", targetUser.phone));
+        } catch (phoneErr) {
+          console.warn("Could not delete used_phones doc:", phoneErr);
+        }
+      }
 
-      const data = await res.json();
+      // 2. Delete the user profile doc directly from Firestore (Instant)
+      await deleteDoc(doc(db, "users", uid));
 
-      if (res.ok) {
-        if (requestId) {
+      // 3. Delete any deletion request for this user
+      if (requestId) {
+        try {
+          await deleteDoc(doc(db, "deletion_requests", requestId));
+        } catch {}
+      }
+
+      // 4. Cascading delete for likes, matches, blocks, reports
+      try {
+        const matchesQuery = query(collection(db, "matches"), where("users", "array-contains", uid));
+        const matchSnap = await getDocs(matchesQuery);
+        for (const mDoc of matchSnap.docs) {
           try {
-            await deleteDoc(doc(db, "deletion_requests", requestId));
+            await deleteDoc(mDoc.ref);
           } catch {}
         }
-        toast.success("User Entirely Vanished & Purged from Firestore!");
-        // Refresh local user state
-        setAllUsers(prev => prev.filter(u => u.uid !== uid));
-      } else {
-        toast.error(data.error || "Purge Failed.");
+
+        const sentLikes = await getDocs(query(collection(db, "likes"), where("from", "==", uid)));
+        const recvLikes = await getDocs(query(collection(db, "likes"), where("to", "==", uid)));
+        const sentBlocks = await getDocs(query(collection(db, "blocks"), where("blocker", "==", uid)));
+        const recvBlocks = await getDocs(query(collection(db, "blocks"), where("blocked", "==", uid)));
+        const userReports = await getDocs(query(collection(db, "reports"), where("reportedId", "==", uid)));
+
+        const batch = writeBatch(db);
+        sentLikes.docs.forEach(d => batch.delete(d.ref));
+        recvLikes.docs.forEach(d => batch.delete(d.ref));
+        sentBlocks.docs.forEach(d => batch.delete(d.ref));
+        recvBlocks.docs.forEach(d => batch.delete(d.ref));
+        userReports.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      } catch (cascadeErr) {
+        console.warn("Cascade cleanup non-blocking note:", cascadeErr);
       }
-    } catch (err) {
-      toast.error("Network / System Error during purge.");
+
+      // 5. Update UI instantly
+      setAllUsers(prev => prev.filter(u => u.uid !== uid));
+      setRequests(prev => prev.filter(r => r.uid !== uid && r.id !== requestId));
+      setReports(prev => prev.filter(rep => rep.reportedId !== uid));
+
+      toast.success("User Entirely Vanished & Purged from Firestore!");
+    } catch (err: unknown) {
+      console.error("Purge error:", err);
+      const msg = err instanceof Error ? err.message : "Purge failed.";
+      toast.error(msg);
     } finally {
       setIsPurging(null);
     }
