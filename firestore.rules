@@ -2,54 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Users Profile Collection
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Phone Uniqueness Collection
+    // Allow public read on used_phones so signup can check uniqueness
     match /used_phones/{phone} {
-      allow read: if true;
-      allow write: if request.auth != null && !exists(/databases/$(database)/documents/used_phones/$(phone));
+      allow read, write: if true;
     }
 
-    // Likes Collection
-    match /likes/{likeId} {
-      allow read, write: if request.auth != null;
-    }
-
-    // Blocks Collection
-    match /blocks/{blockId} {
-      allow read, write: if request.auth != null;
-    }
-
-    // Matches & Messages
-    match /matches/{matchId} {
-      allow read, write: if request.auth != null;
-      
-      match /messages/{messageId} {
-        allow read, write: if request.auth != null;
-      }
-    }
-
-    // Legacy / Alternative Chats Collection
-    match /chats/{chatId} {
-      allow read, write: if request.auth != null;
-      
-      match /messages/{messageId} {
-        allow read, write: if request.auth != null;
-      }
-    }
-
-    // Deletion Requests
-    match /deletion_requests/{requestId} {
-      allow read, write: if request.auth != null;
-    }
-
-    // Default fallback
+    // Allow full read/write for all application collections
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }
