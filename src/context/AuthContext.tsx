@@ -48,6 +48,7 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signupWithEmail: (email: string, pass: string, name: string, extra: Partial<UserProfile>) => Promise<void>;
+  resendVerificationEmail: () => Promise<void>;
   logout: () => Promise<void>;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
 }
@@ -131,6 +132,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(userProfile);
   };
 
+  const resendVerificationEmail = async () => {
+    try {
+      if (auth.currentUser) {
+        await sendEmailVerification(auth.currentUser);
+        toast.success("Verification email resent! Please check your inbox.");
+      } else {
+        toast.error("Please sign in first to receive a verification email.");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to resend verification email";
+      toast.error(msg);
+    }
+  };
+
   const logout = async () => {
     try {
       await signOut(auth);
@@ -142,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, loginWithGoogle, loginWithEmail, signupWithEmail, logout, setProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, loginWithGoogle, loginWithEmail, signupWithEmail, resendVerificationEmail, logout, setProfile }}>
       {loading ? (
         <div className="min-h-screen flex items-center justify-center bg-white font-black italic text-3xl text-black animate-pulse">
           Datie.

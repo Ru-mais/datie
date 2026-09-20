@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { animate } from "animejs";
-import { Heart, X, MapPin, Search, Filter, Loader2, User, Check } from "lucide-react";
+import { Heart, X, MapPin, Search, Filter, Loader2, User, Check, MailCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { collection, query, getDocs, limit, doc, setDoc, getDoc, serverTimestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -13,12 +13,13 @@ const DISTRICTS = ["All", "Alappuzha", "Ernakulam", "Idukki", "Kannur", "Kasarag
 const GENDERS = ["All", "Male", "Female", "Other"];
 
 export default function DiscoverPage() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, resendVerificationEmail } = useAuth();
   const router = useRouter();
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
   const [isFetching, setIsFetching] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [resending, setResending] = useState(false);
 
   // Filter States
   const [filters, setFilters] = useState({
@@ -29,6 +30,12 @@ export default function DiscoverPage() {
     religion: ""
   });
   const [matchingWith, setMatchingWith] = useState<any>(null);
+
+  const handleResend = async () => {
+    setResending(true);
+    await resendVerificationEmail();
+    setResending(false);
+  };
 
   const handleLike = async (targetUser: any) => {
     if (!user) return;
@@ -148,6 +155,27 @@ export default function DiscoverPage() {
     <main className="min-h-screen bg-gray-50/50 pt-32 pb-20 px-6 overflow-hidden relative">
       <div className="max-w-7xl mx-auto">
         
+        {user && !user.emailVerified && (
+          <div className="mb-8 p-6 bg-white border-2 border-black rounded-3xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-card opacity-0">
+            <div className="flex items-center gap-4 text-left">
+              <div className="w-12 h-12 rounded-2xl bg-black text-white flex items-center justify-center shrink-0">
+                <MailCheck size={24} />
+              </div>
+              <div>
+                <h4 className="font-black uppercase tracking-tight text-sm">Please Verify Your Email Address</h4>
+                <p className="text-gray-400 text-xs font-semibold">We sent a verification link to <strong className="text-black">{user.email}</strong>. Check your inbox/spam.</p>
+              </div>
+            </div>
+            <button
+              onClick={handleResend}
+              disabled={resending}
+              className="px-6 py-3 bg-black text-white rounded-full font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-all shadow-lg shrink-0 disabled:opacity-50"
+            >
+              {resending ? "Sending..." : "Resend Link"}
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
           <div className="animate-card opacity-0">
             <h1 className="text-6xl font-black tracking-tighter italic uppercase mb-2">Discover</h1>
