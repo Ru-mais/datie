@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
   // Content Security Policy
   response.headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com; frame-ancestors 'none';"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebase.com https://*.firebasestorage.app https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com wss://*.firebaseio.com; frame-ancestors 'none';"
   );
   // Permissions policy
   response.headers.set(
