@@ -17,39 +17,65 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "UID is required" }, { status: 400 });
     }
 
-    console.log(`Starting Cascading Deletion for user: ${uid}`);
+    console.log(`Starting Total Purge for user: ${uid}`);
 
-    // 1. Delete all MATCHES (and their nested messages)
+    // 1. Fetch user doc to read their phone and email
+    const userDocRef = doc(db, "users", uid);
+    const userDocSnap = await getDoc(userDocRef);
+    const userData = userDocSnap.exists() ? userDocSnap.data() : null;
+
+    // 2. Delete used_phones reservation so the phone number is released
+    if (userData?.phone) {
+      try {
+        await deleteDoc(doc(db, "used_phones", userData.phone));
+      } catch (e) {
+        console.warn("Failed to delete used_phones doc:", e);
+      }
+    }
+
+    // 3. Delete MATCHES and all subcollection messages
     const matchesRef = collection(db, "matches");
     const matchesQuery = query(matchesRef, where("users", "array-contains", uid));
     const matchSnap = await getDocs(matchesQuery);
     
     for (const matchDoc of matchSnap.docs) {
-       // Delete nested messages first
        const messagesRef = collection(db, "matches", matchDoc.id, "messages");
        const msgSnap = await getDocs(messagesRef);
-       const batch = writeBatch(db);
-       msgSnap.docs.forEach((msg) => batch.delete(msg.ref));
-       await batch.commit();
-       
-       // Delete the match itself
+       if (!msgSnap.empty) {
+         const batch = writeBatch(db);
+         msgSnap.docs.forEach((msg) => batch.delete(msg.ref));
+         await batch.commit();
+       }
        await deleteDoc(matchDoc.ref);
     }
 
-    // 2. Delete LIKES (Sent or Received)
-    const likesRef = collection(db, "likes");
-    const sentLikesQuery = query(likesRef, where("from", "==", uid));
-    const receivedLikesQuery = query(likesRef, where("to", "==", uid));
+    // 4. Delete CHATS and all subcollection messages
+    const chatsRef = collection(db, "chats");
+    const chatsQuery = query(chatsRef, where("participants", "array-contains", uid));
+    const chatSnap = await getDocs(chatsQuery);
     
-    const sentLikes = await getDocs(sentLikesQuery);
-    const receivedLikes = await getDocs(receivedLikesQuery);
+    for (const chatDoc of chatSnap.docs) {
+       const messagesRef = collection(db, "chats", chatDoc.id, "messages");
+       const msgSnap = await getDocs(messagesRef);
+       if (!msgSnap.empty) {
+         const batch = writeBatch(db);
+         msgSnap.docs.forEach((msg) => batch.delete(msg.ref));
+         await batch.commit();
+       }
+       await deleteDoc(chatDoc.ref);
+    }
+
+    // 5. Delete LIKES (Sent or Received)
+    const likesRef = collection(db, "likes");
+    const sentLikes = await getDocs(query(likesRef, where("from", "==", uid)));
+    const receivedLikes = await getDocs(query(likesRef, where("to", "==", uid)));
     
     const likesBatch = writeBatch(db);
     sentLikes.docs.forEach(d => likesBatch.delete(d.ref));
     receivedLikes.docs.forEach(d => likesBatch.delete(d.ref));
     await likesBatch.commit();
 
-    // 3. Delete BLOCKS (Sent or Received)
+    // 6. Delete BLOCKS (Sent or Received)
     const blocksRef = collection(db, "blocks");
     const sentBlocks = await getDocs(query(blocksRef, where("blocker", "==", uid)));
     const receivedBlocks = await getDocs(query(blocksRef, where("blocked", "==", uid)));
@@ -59,23 +85,31 @@ export async function POST(req: Request) {
     receivedBlocks.docs.forEach(d => blocksBatch.delete(d.ref));
     await blocksBatch.commit();
 
-    // 4. Get USER email first to purge their credentials
-    const userDocRef = doc(db, "users", uid);
-    const userDocSnap = await getDoc(userDocRef);
-    if (userDocSnap.exists()) {
-      const userData = userDocSnap.data();
-      if (userData.email) {
-        const authDocRef = doc(db, "users_auth", userData.email.toLowerCase().trim());
-        await deleteDoc(authDocRef);
-      }
+    // 7. Delete DELETION_REQUESTS for this user
+    const delReqs = await getDocs(query(collection(db, "deletion_requests"), where("uid", "==", uid)));
+    const delBatch = writeBatch(db);
+    delReqs.docs.forEach(d => delBatch.delete(d.ref));
+    await delBatch.commit();
+
+    // 8. Delete REPORTS involving this user
+    const reportsTarget = await getDocs(query(collection(db, "reports"), where("reportedId", "==", uid)));
+    const repBatch = writeBatch(db);
+    reportsTarget.docs.forEach(d => repBatch.delete(d.ref));
+    await repBatch.commit();
+
+    // 9. Delete legacy users_auth if present
+    if (userData?.email) {
+      try {
+        await deleteDoc(doc(db, "users_auth", userData.email.toLowerCase().trim()));
+      } catch {}
     }
 
-    // 5. Delete the USER Profile
+    // 10. Delete the USER Profile
     await deleteDoc(userDocRef);
 
     return NextResponse.json({ 
       success: true, 
-      message: `User ${uid} and all related data (matches, messages, likes) have been permanently purged.` 
+      message: `User ${uid} and all associated records (matches, messages, likes, blocks, phone reservation) have been permanently wiped from Firestore.` 
     });
 
   } catch (error: any) {

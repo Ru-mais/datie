@@ -67,7 +67,7 @@ export default function SignupPage() {
         district: formData.district
       });
       
-      toast.success("Account Created! Please check your email to verify your account.");
+      toast.success("Welcome to Datie! Your account has been created.");
       router.push("/discover");
     } catch (err: unknown) {
       console.error(err);

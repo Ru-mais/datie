@@ -100,7 +100,6 @@ export default function DiscoverPage() {
           .filter((u: any) => 
             u.uid !== user.uid && 
             u.name && 
-            u.phoneVerified === true && // ONLY show users who passed the real SMS check
             !blockedIds.includes(u.uid) && 
             !likedIds.includes(u.uid)
           ); 
@@ -154,27 +153,6 @@ export default function DiscoverPage() {
   return (
     <main className="min-h-screen bg-gray-50/50 pt-32 pb-20 px-6 overflow-hidden relative">
       <div className="max-w-7xl mx-auto">
-        
-        {user && !user.emailVerified && (
-          <div className="mb-8 p-6 bg-white border-2 border-black rounded-3xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-card opacity-0">
-            <div className="flex items-center gap-4 text-left">
-              <div className="w-12 h-12 rounded-2xl bg-black text-white flex items-center justify-center shrink-0">
-                <MailCheck size={24} />
-              </div>
-              <div>
-                <h4 className="font-black uppercase tracking-tight text-sm">Please Verify Your Email Address</h4>
-                <p className="text-gray-400 text-xs font-semibold">We sent a verification link to <strong className="text-black">{user.email}</strong>. Check your inbox/spam.</p>
-              </div>
-            </div>
-            <button
-              onClick={handleResend}
-              disabled={resending}
-              className="px-6 py-3 bg-black text-white rounded-full font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-all shadow-lg shrink-0 disabled:opacity-50"
-            >
-              {resending ? "Sending..." : "Resend Link"}
-            </button>
-          </div>
-        )}
 
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
           <div className="animate-card opacity-0">
