@@ -8,6 +8,7 @@ import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc, serv
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import VerifiedBadge from "@/components/VerifiedBadge";
 
 export default function MatchesPage() {
   const { user, loading } = useAuth();
@@ -113,30 +114,30 @@ export default function MatchesPage() {
   };
 
   if (loading || isFetching) return (
-    <div className="min-h-screen flex items-center justify-center bg-white font-black italic text-3xl text-black">Datie.</div>
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black font-black italic text-3xl text-black dark:text-white">Datie.</div>
   );
 
   return (
-    <main className="min-h-screen bg-white pt-32 pb-20 px-6">
+    <main className="min-h-screen bg-white dark:bg-black text-black dark:text-white pt-32 pb-20 px-6 transition-colors duration-300">
       <div className="max-w-4xl mx-auto">
 
         {/* Header & Tabs */}
         <div className="mb-12">
-          <h1 className="text-6xl font-black tracking-tighter italic uppercase mb-8">Connections</h1>
-          <div className="flex gap-8 border-b-2 border-gray-100">
+          <h1 className="text-6xl font-black tracking-tighter italic uppercase mb-8 text-black dark:text-white">Connections</h1>
+          <div className="flex gap-8 border-b-2 border-gray-100 dark:border-neutral-800">
             <button
               onClick={() => setActiveTab("matches")}
-              className={`pb-4 px-2 font-black uppercase text-[10px] tracking-widest transition-all relative ${activeTab === "matches" ? "text-black" : "text-gray-300"}`}
+              className={`pb-4 px-2 font-black uppercase text-[10px] tracking-widest transition-all relative ${activeTab === "matches" ? "text-black dark:text-white" : "text-gray-300 dark:text-neutral-600 hover:text-black dark:hover:text-white"}`}
             >
               Matches ({matches.length})
-              {activeTab === "matches" && <div className="absolute bottom-[-2px] left-0 right-0 h-1 bg-black" />}
+              {activeTab === "matches" && <div className="absolute bottom-[-2px] left-0 right-0 h-1 bg-black dark:bg-white" />}
             </button>
             <button
               onClick={() => setActiveTab("likedMe")}
-              className={`pb-4 px-2 font-black uppercase text-[10px] tracking-widest transition-all relative ${activeTab === "likedMe" ? "text-black" : "text-gray-300"}`}
+              className={`pb-4 px-2 font-black uppercase text-[10px] tracking-widest transition-all relative ${activeTab === "likedMe" ? "text-black dark:text-white" : "text-gray-300 dark:text-neutral-600 hover:text-black dark:hover:text-white"}`}
             >
               Star Gazers ({likedMe.length})
-              {activeTab === "likedMe" && <div className="absolute bottom-[-2px] left-0 right-0 h-1 bg-black" />}
+              {activeTab === "likedMe" && <div className="absolute bottom-[-2px] left-0 right-0 h-1 bg-black dark:bg-white" />}
             </button>
           </div>
         </div>
@@ -147,15 +148,18 @@ export default function MatchesPage() {
               <EmptyState title="No Matches Yet" desc="Start swiping to find your spark." onAction={() => router.push("/discover")} />
             ) : (
               matches.map((m) => (
-                <div key={m.id} onClick={() => router.push(`/chat/${m.id}`)} className="animate-match-card opacity-0 p-6 border-2 border-black rounded-[2.5rem] flex items-center justify-between hover:bg-gray-50 transition-all cursor-pointer group shadow-sm">
+                <div key={m.id} onClick={() => router.push(`/chat/${m.id}`)} className="animate-match-card opacity-0 p-6 border-2 border-black dark:border-neutral-700 bg-white dark:bg-neutral-900 rounded-[2.5rem] flex items-center justify-between hover:bg-gray-50 dark:hover:bg-neutral-800/60 transition-all cursor-pointer group shadow-sm">
                   <div className="flex items-center gap-6">
                     <Avatar url={m.otherUser.photoURL} />
                     <div>
-                      <h3 className="text-2xl font-black italic uppercase tracking-tighter leading-tight">{m.otherUser.name}</h3>
-                      <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest italic line-clamp-1 opacity-60">{m.lastMessage || "Start the magic..."}</p>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-2xl font-black italic uppercase tracking-tighter leading-tight text-black dark:text-white">{m.otherUser.name}</h3>
+                        <VerifiedBadge isVerified={m.otherUser.photoVerified} size="md" />
+                      </div>
+                      <p className="text-gray-400 dark:text-neutral-500 text-[10px] font-black uppercase tracking-widest italic line-clamp-1 opacity-60">{m.lastMessage || "Start the magic..."}</p>
                     </div>
                   </div>
-                  <button className="p-4 bg-black text-white rounded-2xl group-hover:scale-110 transition-all shadow-xl">
+                  <button className="p-4 bg-black dark:bg-white text-white dark:text-black rounded-2xl group-hover:scale-110 transition-all shadow-xl">
                     <MessageCircle size={20} />
                   </button>
                 </div>
@@ -171,16 +175,19 @@ export default function MatchesPage() {
             ) : (
               likedMe.map((u) => (
                 <div key={u.uid} className="animate-match-card opacity-0 group relative">
-                  <div onClick={() => router.push(`/profile/${u.uid}`)} className="aspect-[3/4] rounded-[3rem] overflow-hidden border-2 border-black relative shadow-lg cursor-pointer">
+                  <div onClick={() => router.push(`/profile/${u.uid}`)} className="aspect-[3/4] rounded-[3rem] overflow-hidden border-2 border-black dark:border-neutral-700 relative shadow-lg cursor-pointer bg-gray-100 dark:bg-neutral-900">
                     {u.photoURL ? (
                       <img src={u.photoURL} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 ease-in-out" />
                     ) : (
-                      <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-200">
+                      <div className="w-full h-full bg-gray-100 dark:bg-neutral-800 flex items-center justify-center text-gray-200 dark:text-neutral-700">
                         <User size={64} />
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-6">
-                      <h3 className="text-white font-black italic uppercase tracking-tighter text-2xl mb-1">{u.name}, {u.age}</h3>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <h3 className="text-white font-black italic uppercase tracking-tighter text-2xl">{u.name}, {u.age}</h3>
+                        <VerifiedBadge isVerified={u.photoVerified} size="md" />
+                      </div>
                       <p className="text-white/40 text-[9px] font-black uppercase tracking-[0.2em]">{u.district}</p>
                     </div>
                   </div>
@@ -189,15 +196,15 @@ export default function MatchesPage() {
                   <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 z-20">
                     <button
                       onClick={() => handleReject(u.uid)}
-                      className="w-12 h-12 bg-white border-2 border-black rounded-2xl flex items-center justify-center hover:bg-black hover:text-white transition-all shadow-xl active:scale-90"
+                      className="w-12 h-12 bg-white dark:bg-neutral-900 text-black dark:text-white border-2 border-black dark:border-neutral-700 rounded-2xl flex items-center justify-center hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-all shadow-xl active:scale-90"
                     >
                       <X size={20} />
                     </button>
                     <button
                       onClick={() => handleLikeBack(u.uid)}
-                      className="w-12 h-12 bg-black text-white border-2 border-black rounded-2xl flex items-center justify-center hover:scale-110 transition-all shadow-xl active:scale-90"
+                      className="w-12 h-12 bg-black dark:bg-white text-white dark:text-black border-2 border-black dark:border-white rounded-2xl flex items-center justify-center hover:scale-110 transition-all shadow-xl active:scale-90"
                     >
-                      <Heart size={20} className="fill-white" />
+                      <Heart size={20} className="fill-white dark:fill-black" />
                     </button>
                   </div>
                 </div>
@@ -213,21 +220,21 @@ export default function MatchesPage() {
 
 function Avatar({ url }: { url?: string }) {
   return (
-    <div className="w-20 h-20 rounded-full border-2 border-black overflow-hidden bg-gray-50 shrink-0 shadow-md">
-      {url ? <img src={url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-200"><User size={32} /></div>}
+    <div className="w-20 h-20 rounded-full border-2 border-black dark:border-neutral-700 overflow-hidden bg-gray-50 dark:bg-neutral-800 shrink-0 shadow-md">
+      {url ? <img src={url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-200 dark:text-neutral-700"><User size={32} /></div>}
     </div>
   );
 }
 
 function EmptyState({ title, desc, onAction }: { title: string; desc: string; onAction: () => void }) {
   return (
-    <div className="text-center py-24 border-4 border-dashed border-gray-100 rounded-[3.5rem] animate-match-card opacity-0 bg-white">
-      <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-8">
-        <Heart size={40} className="text-gray-100 animate-pulse" />
+    <div className="text-center py-24 border-4 border-dashed border-gray-100 dark:border-neutral-800 rounded-[3.5rem] animate-match-card opacity-0 bg-white dark:bg-neutral-950">
+      <div className="w-24 h-24 bg-gray-50 dark:bg-neutral-900 rounded-full flex items-center justify-center mx-auto mb-8">
+        <Heart size={40} className="text-gray-100 dark:text-neutral-700 animate-pulse" />
       </div>
-      <h2 className="text-5xl font-black italic uppercase tracking-tighter mb-2">{title}</h2>
-      <p className="text-gray-400 font-black uppercase text-[10px] tracking-[0.3em] mb-10 max-w-xs mx-auto leading-loose">{desc}</p>
-      <button onClick={onAction} className="px-12 py-5 bg-black text-white rounded-full font-black uppercase text-[10px] tracking-widest hover:scale-110 active:scale-95 transition-all shadow-2xl">Discover Stars</button>
+      <h2 className="text-5xl font-black italic uppercase tracking-tighter mb-2 text-black dark:text-white">{title}</h2>
+      <p className="text-gray-400 dark:text-neutral-500 font-black uppercase text-[10px] tracking-[0.3em] mb-10 max-w-xs mx-auto leading-loose">{desc}</p>
+      <button onClick={onAction} className="px-12 py-5 bg-black dark:bg-white text-white dark:text-black rounded-full font-black uppercase text-[10px] tracking-widest hover:scale-110 active:scale-95 transition-all shadow-2xl">Discover Stars</button>
     </div>
   );
 }

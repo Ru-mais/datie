@@ -1,13 +1,24 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { animate } from "animejs";
-import { Send, ArrowLeft, User, Loader2, Trash2, Edit2, X, Check, ShieldAlert, Mic, Square, Play, Pause, Volume2 } from "lucide-react";
+import { 
+  Send, ArrowLeft, User, Loader2, Trash2, Edit2, X, 
+  Check, CheckCheck, ShieldAlert, Mic, Square, Play, Pause, Volume2, Sparkles 
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
+import { 
+  collection, query, orderBy, onSnapshot, addDoc, 
+  serverTimestamp, doc, getDoc, updateDoc, deleteDoc, setDoc, writeBatch 
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter, useParams } from "next/navigation";
 import toast from "react-hot-toast";
+import { sanitizeMessage } from "@/lib/contentFilter";
+import VerifiedBadge from "@/components/VerifiedBadge";
+import { validateMessage } from "@/lib/validation";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { showLocalNotification } from "@/lib/notifications";
 
 export default function ChatPage() {
   const { user, loading } = useAuth();
@@ -22,8 +33,19 @@ export default function ChatPage() {
   const [editingMessage, setEditingMessage] = useState<any>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isOtherTyping, setIsOtherTyping] = useState(false);
 
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Format message time
+  const formatTime = (timestamp: any) => {
+    if (!timestamp) return "";
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // 1. Fetch Match & Other User Info + Real-Time Typing Listener
   useEffect(() => {
     if (loading === false && !user) router.push("/login");
 
@@ -33,8 +55,10 @@ export default function ChatPage() {
         if (matchSnap.exists()) {
           const data = matchSnap.data();
           const otherId = data.users.find((id: string) => id !== user?.uid);
-          const userSnap = await getDoc(doc(db, "users", otherId));
-          if (userSnap.exists()) setOtherUser({ ...userSnap.data(), uid: otherId });
+          if (otherId) {
+            const userSnap = await getDoc(doc(db, "users", otherId));
+            if (userSnap.exists()) setOtherUser({ ...userSnap.data(), uid: otherId });
+          }
         }
       } catch (err) {
         toast.error("Could not load chat info");
@@ -43,22 +67,97 @@ export default function ChatPage() {
 
     if (loading === false && user) fetchMatchInfo();
 
+    // Listen to match doc for typing status & real-time updates
+    const matchUnsub = onSnapshot(doc(db, "matches", matchId), (snap) => {
+      if (snap.exists() && user) {
+        const matchData = snap.data();
+        const otherId = matchData.users?.find((id: string) => id !== user.uid);
+        if (otherId && matchData.typing) {
+          setIsOtherTyping(Boolean(matchData.typing[otherId]));
+        }
+      }
+    });
+
+    // 2. Real-Time Messages & Read Receipts Listener
     if (user && matchId) {
       const messagesRef = collection(db, "matches", matchId, "messages");
       const q = query(messagesRef, orderBy("timestamp", "asc"));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      const messagesUnsub = onSnapshot(q, async (snapshot) => {
         const fetchedMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setMessages(fetchedMessages);
         scrollToBottom();
+
+        // Automatically Mark Incoming Unread Messages as Read
+        const unreadDocs = snapshot.docs.filter(
+          doc => doc.data().senderId !== user.uid && !doc.data().read
+        );
+
+        if (unreadDocs.length > 0) {
+          // If browser tab is in background, show web push notification
+          if (typeof document !== "undefined" && document.hidden) {
+            const latestUnread = unreadDocs[unreadDocs.length - 1].data();
+            showLocalNotification(otherUser?.name || "New Message", {
+              body: latestUnread.type === "voice" ? "🎙️ Sent you a voice note" : (latestUnread.text || "Sent you a message"),
+              url: `/chat/${matchId}`
+            });
+          }
+
+          const batch = writeBatch(db);
+          unreadDocs.forEach(docSnap => {
+            batch.update(docSnap.ref, { read: true, readAt: serverTimestamp() });
+          });
+          try {
+            await batch.commit();
+          } catch (e) {
+            console.error("Read receipt batch update error:", e);
+          }
+        }
       });
-      return () => unsubscribe();
+
+      return () => {
+        matchUnsub();
+        messagesUnsub();
+      };
     }
+
+    return () => matchUnsub();
   }, [user, loading, matchId, router]);
 
   const scrollToBottom = () => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   };
 
+  // 3. Handle Typing Indicator with Debounce
+  const handleTyping = (text: string) => {
+    setNewMessage(text);
+    if (!user || !matchId) return;
+
+    // Send typing: true
+    updateDoc(doc(db, "matches", matchId), {
+      [`typing.${user.uid}`]: true
+    }).catch(() => {});
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    // Reset typing status after 1.8s of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      updateDoc(doc(db, "matches", matchId), {
+        [`typing.${user.uid}`]: false
+      }).catch(() => {});
+    }, 1800);
+  };
+
+  const clearTypingStatus = () => {
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (user && matchId) {
+      updateDoc(doc(db, "matches", matchId), {
+        [`typing.${user.uid}`]: false
+      }).catch(() => {});
+    }
+  };
+
+  // Voice Note Recording
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -101,6 +200,7 @@ export default function ChatPage() {
         senderId: user.uid, 
         type: "voice", 
         audioURL: audioData, 
+        read: false,
         timestamp: serverTimestamp() 
       });
       await updateDoc(doc(db, "matches", matchId), { 
@@ -114,44 +214,60 @@ export default function ChatPage() {
     }
   };
 
-  const filterMessage = (text: string) => {
-    const badWords = ["badword1", "badword2", "toxic", "abuse"];
-    let filteredText = text;
-    badWords.forEach(word => {
-      const regex = new RegExp(word, "gi");
-      filteredText = filteredText.replace(regex, "****");
-    });
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const hasLinks = urlRegex.test(filteredText);
-    return { filteredText, hasLinks };
-  };
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || isSending) return;
+    if (!user || isSending) return;
 
-    const { filteredText, hasLinks } = filterMessage(newMessage);
-    if (hasLinks && !confirm("Your message contains a link. Send anyway?")) return;
+    // Validate message length and content
+    const msgValidation = validateMessage(newMessage);
+    if (!msgValidation.valid) {
+      toast.error(msgValidation.error || "Please enter a message");
+      return;
+    }
+
+    // Rate limit check: max 30 messages/minute
+    const rateCheck = await checkRateLimit(`chat:${user.uid}`, 30, 60);
+    if (!rateCheck.success) {
+      toast.error(`Slow down! Too many messages. Please wait ${rateCheck.resetSeconds}s.`, { icon: "⏳" });
+      return;
+    }
+
+    // Apply Smart Content Filter
+    const { cleanText, isToxic, hasLinks } = sanitizeMessage(msgValidation.cleanText);
+
+    if (isToxic) {
+      toast("Inappropriate keywords were sanitized for safety.", { icon: "🛡️" });
+    }
+
+    if (hasLinks && !confirm("This message contains external links. Are you sure you want to send it?")) {
+      return;
+    }
 
     if (editingMessage) {
-      await handleUpdateMessage(filteredText);
+      await handleUpdateMessage(cleanText);
       return;
     }
 
     setIsSending(true);
     setNewMessage("");
+    clearTypingStatus();
+
     try {
       const messagesRef = collection(db, "matches", matchId, "messages");
       await addDoc(messagesRef, { 
         senderId: user.uid, 
         type: "text", 
-        text: filteredText, 
+        text: cleanText, 
+        read: false,
         timestamp: serverTimestamp() 
       });
-      await updateDoc(doc(db, "matches", matchId), { lastMessage: filteredText, timestamp: serverTimestamp() });
+      await updateDoc(doc(db, "matches", matchId), { 
+        lastMessage: cleanText, 
+        timestamp: serverTimestamp() 
+      });
     } catch (err) {
-      toast.error("Failed to send");
-      setNewMessage(filteredText);
+      console.error(err);
+      toast.error("Failed to send message");
     } finally {
       setIsSending(false);
     }
@@ -208,87 +324,133 @@ export default function ChatPage() {
   };
 
   if (loading || !otherUser) return (
-    <div className="min-h-screen flex items-center justify-center bg-white font-black italic text-3xl text-black">Datie.</div>
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black font-black italic text-3xl text-black dark:text-white">Datie.</div>
   );
 
   return (
-    <main className="h-screen bg-white flex flex-col pt-24 overflow-hidden">
+    <main className="h-screen bg-white dark:bg-neutral-950 text-black dark:text-white flex flex-col pt-24 overflow-hidden transition-colors duration-300">
       {/* Header */}
-      <div className="p-6 border-b-2 border-gray-100 flex items-center justify-between bg-white z-10 shadow-sm">
+      <div className="p-6 border-b-2 border-gray-100 dark:border-neutral-800 flex items-center justify-between bg-white dark:bg-neutral-900 z-10 shadow-sm">
         <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-gray-50 rounded-full transition-all">
+          <button onClick={() => router.back()} className="p-2 hover:bg-gray-50 dark:hover:bg-neutral-800 rounded-full transition-all text-black dark:text-white">
             <ArrowLeft size={24} />
           </button>
           <div 
             onClick={() => router.push(`/profile/${otherUser.uid}`)}
-            className="w-12 h-12 rounded-full border-2 border-black overflow-hidden bg-gray-100 shrink-0 cursor-pointer hover:scale-110 transition-all active:scale-95 shadow-md"
+            className="w-12 h-12 rounded-full border-2 border-black dark:border-neutral-700 overflow-hidden bg-gray-100 dark:bg-neutral-800 shrink-0 cursor-pointer hover:scale-110 transition-all active:scale-95 shadow-md relative"
           >
-             {otherUser.photoURL ? <img src={otherUser.photoURL} className="w-full h-full object-cover" /> : <User size={24} className="m-auto mt-2 text-gray-300" />}
+             {otherUser.photoURL ? <img src={otherUser.photoURL} className="w-full h-full object-cover" /> : <User size={24} className="m-auto mt-2 text-gray-300 dark:text-neutral-600" />}
           </div>
           <div 
             onClick={() => router.push(`/profile/${otherUser.uid}`)}
             className="cursor-pointer group"
           >
-            <h2 className="font-black italic uppercase tracking-tighter text-lg leading-tight group-hover:text-gray-500 transition-colors">{otherUser.name}</h2>
             <div className="flex items-center gap-1.5">
-               <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">View Profile</span>
+              <h2 className="font-black italic uppercase tracking-tighter text-lg leading-tight group-hover:text-gray-500 dark:group-hover:text-neutral-400 text-black dark:text-white transition-colors">{otherUser.name}</h2>
+              <VerifiedBadge isVerified={otherUser.photoVerified} size="sm" />
+            </div>
+            <div className="flex items-center gap-1.5">
+               {isOtherTyping ? (
+                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500 animate-pulse flex items-center gap-1">
+                   Typing...
+                 </span>
+               ) : (
+                 <>
+                   <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500">View Profile</span>
+                 </>
+               )}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleDeleteChat} className="p-3 text-gray-400 hover:bg-gray-50 hover:text-black rounded-2xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest transition-all">
+          <button onClick={handleDeleteChat} className="p-3 text-gray-400 dark:text-neutral-500 hover:bg-gray-50 dark:hover:bg-neutral-800 hover:text-black dark:hover:text-white rounded-2xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest transition-all">
              <Trash2 size={18} /> Delete Chat
           </button>
-          <button onClick={handleBlockUser} className="p-3 text-red-500 hover:bg-red-50 rounded-2xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest transition-all">
+          <button onClick={handleBlockUser} className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-2xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest transition-all">
              <ShieldAlert size={18} /> Block
           </button>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar bg-gray-50/20">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar bg-gray-50/20 dark:bg-black/40">
         {messages.map((msg: any) => {
           const isMe = msg.senderId === user?.uid;
           return (
             <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
               <div className="relative group max-w-[80%]">
                 <div className={`p-4 rounded-[2rem] text-sm font-medium shadow-sm transition-all ${
-                  isMe ? "bg-black text-white rounded-br-none" : "bg-white border-2 border-black text-black rounded-bl-none"
+                  isMe 
+                    ? "bg-black dark:bg-white text-white dark:text-black rounded-br-none" 
+                    : "bg-white dark:bg-neutral-900 border-2 border-black dark:border-neutral-700 text-black dark:text-white rounded-bl-none"
                 }`}>
                   {msg.type === "voice" ? (
                     <VoicePlayer url={msg.audioURL} isMe={isMe} />
                   ) : (
                     msg.text
                   )}
-                  {msg.edited && <span className="block text-[8px] opacity-40 mt-1 uppercase font-black italic">Edited</span>}
+
+                  {/* Message Meta: Time, Edited status, and Read Receipts */}
+                  <div className={`flex items-center gap-1.5 justify-end mt-1 text-[9px] font-black uppercase ${
+                    isMe ? "text-white/60 dark:text-black/60" : "text-gray-400 dark:text-neutral-500"
+                  }`}>
+                    {msg.edited && <span className="italic">Edited • </span>}
+                    <span>{formatTime(msg.timestamp)}</span>
+                    
+                    {/* Read Receipts Checkmarks (For Outgoing Messages) */}
+                    {isMe && (
+                      <span title={msg.read ? "Read by " + otherUser.name : "Delivered"}>
+                        {msg.read ? (
+                          <CheckCheck size={13} className="text-cyan-400 dark:text-blue-600 stroke-[2.5]" />
+                        ) : (
+                          <Check size={13} className="text-white/40 dark:text-black/40 stroke-[2]" />
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
                 {isMe && msg.type !== "voice" && (
                   <div className="absolute top-0 -left-12 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                    <button onClick={() => { setEditingMessage(msg); setNewMessage(msg.text); }} className="p-2 bg-white border border-black/5 rounded-full shadow-lg hover:scale-110"><Edit2 size={12} /></button>
-                    <button onClick={() => handleDeleteMessage(msg.id)} className="p-2 bg-white border border-black/5 rounded-full shadow-lg hover:scale-110 text-red-500"><Trash2 size={12} /></button>
+                    <button onClick={() => { setEditingMessage(msg); setNewMessage(msg.text); }} className="p-2 bg-white dark:bg-neutral-800 border border-black/5 dark:border-neutral-700 text-black dark:text-white rounded-full shadow-lg hover:scale-110"><Edit2 size={12} /></button>
+                    <button onClick={() => handleDeleteMessage(msg.id)} className="p-2 bg-white dark:bg-neutral-800 border border-black/5 dark:border-neutral-700 rounded-full shadow-lg hover:scale-110 text-red-500"><Trash2 size={12} /></button>
                   </div>
                 )}
                 {isMe && msg.type === "voice" && (
                   <div className="absolute top-0 -left-8 opacity-0 group-hover:opacity-100 transition-all">
-                    <button onClick={() => handleDeleteMessage(msg.id)} className="p-2 bg-white border border-black/5 rounded-full shadow-lg hover:scale-110 text-red-500"><Trash2 size={12} /></button>
+                    <button onClick={() => handleDeleteMessage(msg.id)} className="p-2 bg-white dark:bg-neutral-800 border border-black/5 dark:border-neutral-700 rounded-full shadow-lg hover:scale-110 text-red-500"><Trash2 size={12} /></button>
                   </div>
                 )}
               </div>
             </div>
           );
         })}
+
+        {/* Live Typing Bouncing Bubble */}
+        {isOtherTyping && (
+          <div className="flex justify-start animate-fade-in">
+            <div className="px-5 py-3 rounded-[2rem] rounded-bl-none bg-white dark:bg-neutral-900 border-2 border-black dark:border-neutral-700 text-black dark:text-white shadow-md flex items-center gap-2">
+              <span className="text-xs font-bold italic">{otherUser.name} is typing</span>
+              <div className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-black dark:bg-white animate-bounce" style={{ animationDelay: "0ms" }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-black dark:bg-white animate-bounce" style={{ animationDelay: "150ms" }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-black dark:bg-white animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-6 bg-white border-t-2 border-gray-100">
+      {/* Input Tray */}
+      <div className="p-6 bg-white dark:bg-neutral-900 border-t-2 border-gray-100 dark:border-neutral-800">
         <div className="flex items-center gap-4 max-w-5xl mx-auto">
           {editingMessage ? (
-            <button type="button" onClick={() => { setEditingMessage(null); setNewMessage(""); }} className="p-4 bg-red-50 text-red-500 rounded-2xl"><X size={20} /></button>
+            <button type="button" onClick={() => { setEditingMessage(null); setNewMessage(""); }} className="p-4 bg-red-50 dark:bg-red-950/40 text-red-500 rounded-2xl"><X size={20} /></button>
           ) : isRecording ? (
-             <div className="flex-1 flex items-center gap-4 p-4 bg-red-50 rounded-[2rem] text-red-500 font-black uppercase text-[10px] tracking-[0.2em] animate-pulse">
+             <div className="flex-1 flex items-center gap-4 p-4 bg-red-50 dark:bg-red-950/40 rounded-[2rem] text-red-500 font-black uppercase text-[10px] tracking-[0.2em] animate-pulse">
                 <div className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
                 Recording Voice Note...
              </div>
@@ -296,10 +458,10 @@ export default function ChatPage() {
             <input 
               type="text" 
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => handleTyping(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(e as any)}
-              placeholder="Type your message..."
-              className="flex-1 p-5 bg-gray-50 border-2 border-transparent focus:border-black rounded-[2rem] font-bold text-sm focus:outline-none transition-all"
+              placeholder={`Message ${otherUser?.name || '...'}`}
+              className="flex-1 p-5 bg-gray-50 dark:bg-neutral-800 border-2 border-transparent focus:border-black dark:focus:border-neutral-500 text-black dark:text-white rounded-[2rem] font-bold text-sm focus:outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-neutral-500 shadow-inner"
             />
           )}
 
@@ -307,14 +469,14 @@ export default function ChatPage() {
             {!newMessage.trim() && !editingMessage && (
               <button 
                 onClick={isRecording ? stopRecording : startRecording}
-                className={`p-5 rounded-2xl transition-all shadow-xl ${isRecording ? "bg-red-500 text-white animate-pulse" : "bg-gray-100 text-black hover:bg-black hover:text-white"}`}
+                className={`p-5 rounded-2xl transition-all shadow-xl ${isRecording ? "bg-red-500 text-white animate-pulse" : "bg-gray-100 dark:bg-neutral-800 text-black dark:text-white hover:bg-black dark:hover:bg-white hover:text-white dark:hover:text-black"}`}
               >
                 {isRecording ? <Square size={24} /> : <Mic size={24} />}
               </button>
             )}
             
             {(newMessage.trim() || editingMessage) && (
-              <button onClick={handleSendMessage} disabled={isSending} className="p-5 bg-black text-white rounded-2xl disabled:opacity-20 hover:scale-105 transition-all shadow-xl">
+              <button onClick={handleSendMessage} disabled={isSending} className="p-5 bg-black dark:bg-white text-white dark:text-black rounded-2xl disabled:opacity-20 hover:scale-105 transition-all shadow-xl">
                 {editingMessage ? <Check size={24} /> : <Send size={24} />}
               </button>
             )}
@@ -341,16 +503,17 @@ function VoicePlayer({ url, isMe }: { url: string; isMe: boolean }) {
   return (
     <div className="flex items-center gap-4 min-w-[150px] py-1">
       <audio ref={audioRef} src={url} onEnded={() => setPlaying(false)} className="hidden" />
-      <button onClick={toggle} className={`p-3 rounded-full transition-all ${isMe ? "bg-white text-black" : "bg-black text-white"}`}>
+      <button onClick={toggle} className={`p-3 rounded-full transition-all ${isMe ? "bg-white dark:bg-black text-black dark:text-white" : "bg-black dark:bg-white text-white dark:text-black"}`}>
         {playing ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
       </button>
       <div className="flex-1 h-8 flex items-center gap-1">
          {[...Array(12)].map((_, i) => (
-           <div key={i} className={`flex-1 rounded-full ${isMe ? "bg-white/30" : "bg-black/10"}`} style={{ height: `${Math.random() * 100}%`, minHeight: '20%' }} />
+           <div key={i} className={`flex-1 rounded-full ${isMe ? "bg-white/40 dark:bg-black/30" : "bg-black/20 dark:bg-white/30"}`} style={{ height: `${Math.random() * 100}%`, minHeight: '20%' }} />
          ))}
       </div>
-      <Volume2 size={14} className={isMe ? "text-white/40" : "text-black/20"} />
+      <Volume2 size={14} className={isMe ? "text-white/60 dark:text-black/60" : "text-black/40 dark:text-white/60"} />
     </div>
   );
 }
+
 

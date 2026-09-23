@@ -1,38 +1,81 @@
-import redis from "./redis";
+// Universal & Browser-safe Rate Limiter (Sliding Window Algorithm)
 
-const RATE_LIMIT_WINDOW = 60; // seconds
-const MAX_REQUESTS_PER_WINDOW = 10; // max attempts per window
+const memoryStore = new Map<string, number[]>();
+
+export interface RateLimitResult {
+  success: boolean;
+  limit: number;
+  remaining: number;
+  resetSeconds: number;
+}
 
 /**
- * Rate limits requests by IP address using Redis.
- * Returns { allowed: true } if within limits, or { allowed: false, retryAfter } if blocked.
+ * Universal Sliding-Window Rate Limiter
+ * @param identifier Unique key (e.g. "swipe:uid123", "chat:uid123")
+ * @param limit Max actions allowed in window
+ * @param windowSeconds Window length in seconds
  */
-export async function rateLimit(
-  ip: string,
-  options?: { window?: number; max?: number; prefix?: string }
-): Promise<{ allowed: boolean; remaining: number; retryAfter?: number }> {
-  const window = options?.window || RATE_LIMIT_WINDOW;
-  const max = options?.max || MAX_REQUESTS_PER_WINDOW;
-  const prefix = options?.prefix || "rl";
-  const key = `${prefix}:${ip}`;
+export async function checkRateLimit(
+  identifier: string,
+  limit: number = 60,
+  windowSeconds: number = 60
+): Promise<RateLimitResult> {
+  const now = Date.now();
+  const windowMs = windowSeconds * 1000;
+  const key = `rl:${identifier}`;
 
-  try {
-    const current = await redis.incr(key);
+  const timestamps = (memoryStore.get(key) || []).filter((t) => now - t < windowMs);
 
-    if (current === 1) {
-      // First request in this window — set expiry
-      await redis.expire(key, window);
-    }
-
-    if (current > max) {
-      const ttl = await redis.ttl(key);
-      return { allowed: false, remaining: 0, retryAfter: ttl };
-    }
-
-    return { allowed: true, remaining: max - current };
-  } catch (error) {
-    // If Redis is down, fail open (allow request) to avoid blocking all users
-    console.error("Rate limit check failed (Redis may be down):", error);
-    return { allowed: true, remaining: max };
+  if (timestamps.length >= limit) {
+    const oldest = timestamps[0];
+    const resetSeconds = Math.ceil((oldest + windowMs - now) / 1000);
+    return {
+      success: false,
+      limit,
+      remaining: 0,
+      resetSeconds: Math.max(1, resetSeconds)
+    };
   }
+
+  timestamps.push(now);
+  memoryStore.set(key, timestamps);
+
+  // Periodically clean stale entries to prevent memory growth
+  if (memoryStore.size > 1000) {
+    for (const [k, v] of memoryStore.entries()) {
+      const valid = v.filter((t) => now - t < windowMs);
+      if (valid.length === 0) memoryStore.delete(k);
+      else memoryStore.set(k, valid);
+    }
+  }
+
+  return {
+    success: true,
+    limit,
+    remaining: limit - timestamps.length,
+    resetSeconds: windowSeconds
+  };
+}
+
+// Client-side swipe limiter (local store for instant UI response)
+const clientSwipeStore: { [key: string]: number[] } = {};
+
+export function checkClientSwipeRateLimit(limit: number = 50, windowSeconds: number = 60): { allowed: boolean; waitSeconds: number } {
+  const now = Date.now();
+  const windowMs = windowSeconds * 1000;
+  
+  if (!clientSwipeStore["swipes"]) {
+    clientSwipeStore["swipes"] = [];
+  }
+
+  clientSwipeStore["swipes"] = clientSwipeStore["swipes"].filter((t) => now - t < windowMs);
+
+  if (clientSwipeStore["swipes"].length >= limit) {
+    const oldest = clientSwipeStore["swipes"][0];
+    const waitSeconds = Math.ceil((oldest + windowMs - now) / 1000);
+    return { allowed: false, waitSeconds: Math.max(1, waitSeconds) };
+  }
+
+  clientSwipeStore["swipes"].push(now);
+  return { allowed: true, waitSeconds: 0 };
 }

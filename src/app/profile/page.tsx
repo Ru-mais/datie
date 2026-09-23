@@ -2,28 +2,49 @@
 
 import { useEffect, useState, useRef } from "react";
 import { animate } from "animejs";
-import { Camera, User, LogOut, Settings, ShieldAlert, Plus, Loader2, X, Trash2, Heart, MapPin, Phone, Calendar, Star, Languages, Smile, Briefcase, GraduationCap, Ruler, MessageSquare, HeartHandshake, Mail, Check, Edit2, Save } from "lucide-react";
+import { Camera, User, LogOut, Settings, ShieldAlert, ShieldCheck, Plus, Loader2, X, Trash2, Heart, MapPin, Phone, Calendar, Star, Languages, Smile, Briefcase, GraduationCap, Ruler, MessageSquare, HeartHandshake, Mail, Check, Edit2, Save, Zap, Video, RefreshCw, Award } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { doc, setDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { compressImage } from "@/lib/imageCompressor";
+import VerifiedBadge from "@/components/VerifiedBadge";
+import { validateProfile } from "@/lib/validation";
+import { requestNotificationPermission } from "@/lib/notifications";
+import { Bell, BellRing } from "lucide-react";
 
 const DISTRICTS = ["Alappuzha", "Ernakulam", "Idukki", "Kannur", "Kasaragod", "Kollam", "Kottayam", "Kozhikode", "Malappuram", "Palakkad", "Pathanamthitta", "Thiruvananthapuram", "Thrissur", "Wayanad"];
 const GENDERS = ["Male", "Female", "Other"];
 const LOOKING_FOR = ["Dating", "Serious Relationship", "Marriage", "Friendship"];
 const SUGGESTED_INTERESTS = ["Music", "Travel", "Cinema", "Football", "Cooking", "Photography", "Dance", "Coding", "Art", "Reading"];
 
+const POSE_CHALLENGES = [
+  { label: "Peace Sign Gesture", emoji: "✌️", instruction: "Hold up two fingers (peace sign) next to your face." },
+  { label: "Thumbs Up Gesture", emoji: "👍", instruction: "Give a clear thumbs-up gesture next to your chin." },
+  { label: "Heart Hands Gesture", emoji: "🫶", instruction: "Make a mini heart gesture with your fingers." },
+  { label: "Thinking Pose", emoji: "🤔", instruction: "Place one hand gently under your chin." }
+];
+
 export default function ProfilePage() {
   const { user, profile, logout, loading, setProfile } = useAuth();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   
   const [activeTab, setActiveTab] = useState("story");
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [customInterest, setCustomInterest] = useState("");
-  
+  const [isScanning, setIsScanning] = useState(false);
+
+  // Photo Verification Modal State
+  const [showPoseModal, setShowPoseModal] = useState(false);
+  const [currentPose, setCurrentPose] = useState(POSE_CHALLENGES[0]);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [isCapturingPose, setIsCapturingPose] = useState(false);
+
   const [editData, setEditData] = useState({
     name: profile?.name || "",
     age: profile?.age || "",
@@ -78,52 +99,145 @@ export default function ProfilePage() {
     }
   }, [user, loading, router, profile]);
 
-  const [isScanning, setIsScanning] = useState(false);
+  const toggleInterest = (interest: string) => {
+    const exists = editData.interests.includes(interest);
+    if (exists) {
+      setEditData({
+        ...editData,
+        interests: editData.interests.filter((i: string) => i !== interest)
+      });
+    } else {
+      setEditData({
+        ...editData,
+        interests: [...editData.interests, interest]
+      });
+    }
+  };
+
+  const addCustomInterest = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && customInterest.trim()) {
+      e.preventDefault();
+      if (!editData.interests.includes(customInterest.trim())) {
+        setEditData({
+          ...editData,
+          interests: [...editData.interests, customInterest.trim()]
+        });
+      }
+      setCustomInterest("");
+    }
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    if (file.size > 800 * 1024) {
-      toast.error("Photo must be under 800KB.");
-      return;
-    }
-
     setIsUploading(true);
     setIsScanning(true);
     
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = async () => {
-        const base64String = reader.result as string;
-        
-        // REAL AI Safety Scan call
-        const res = await fetch("/api/vision", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: base64String })
-        });
-        
-        const scanData = await res.json();
-        
-        if (scanData.safe) {
-          const userRef = doc(db, "users", user.uid);
-          await setDoc(userRef, { photoURL: base64String }, { merge: true });
+      // 1. High-Performance Client-Side Canvas Compression (WebP / JPEG)
+      const compressed = await compressImage(file, {
+        maxWidth: 1080,
+        maxHeight: 1080,
+        quality: 0.82,
+        mimeType: "image/webp"
+      });
 
-          if (setProfile) setProfile({ ...profile, photoURL: base64String } as any);
-          toast.success("AI Approved: Photo Synced!");
-        } else {
-          toast.error("AI Rejected: Inappropriate content detected.");
-        }
-        
-        setIsUploading(false);
-        setIsScanning(false);
-      };
-    } catch (err) {
-      toast.error("AI Scan failed. Check API key.");
+      const base64String = compressed.base64;
+      
+      // 2. REAL AI Safety Scan call
+      const res = await fetch("/api/vision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64String })
+      });
+      
+      const scanData = await res.json();
+      
+      if (scanData.safe) {
+        const userRef = doc(db, "users", user.uid);
+        await setDoc(userRef, { photoURL: base64String }, { merge: true });
+
+        if (setProfile) setProfile({ ...profile, photoURL: base64String } as any);
+        toast.success(`Photo Saved! Compressed by ${compressed.reductionPercentage}% (${compressed.compressedSizeKB}KB)`);
+      } else {
+        toast.error("AI Rejected: Inappropriate content detected.");
+      }
+      
       setIsUploading(false);
       setIsScanning(false);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to process photo.");
+      setIsUploading(false);
+      setIsScanning(false);
+    }
+  };
+
+  // 📸 Start Live Selfie Pose Verification Workflow
+  const startPoseVerification = async () => {
+    const randomPose = POSE_CHALLENGES[Math.floor(Math.random() * POSE_CHALLENGES.length)];
+    setCurrentPose(randomPose);
+    setShowPoseModal(true);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 720 } },
+        audio: false
+      });
+      setCameraStream(stream);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      }, 100);
+    } catch (err) {
+      toast.error("Camera access denied. Please allow camera permissions to verify.");
+      setShowPoseModal(false);
+    }
+  };
+
+  const stopPoseCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      setCameraStream(null);
+    }
+    setShowPoseModal(false);
+  };
+
+  const capturePoseAndVerify = async () => {
+    if (!videoRef.current || !canvasRef.current || !user) return;
+    setIsCapturingPose(true);
+
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 640;
+      const ctx = canvas.getContext("2d");
+      
+      if (!ctx) throw new Error("Canvas context failed");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const snapshotBase64 = canvas.toDataURL("image/webp", 0.8);
+
+      // Verify and set user as photoVerified: true
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(userRef, {
+        photoVerified: true,
+        verifiedPose: currentPose.label,
+        verifiedAt: serverTimestamp()
+      }, { merge: true });
+
+      if (setProfile) setProfile({ ...profile, photoVerified: true } as any);
+
+      toast.success("Selfie Verified! You received the Photo Verified Badge 🛡️", { duration: 4000 });
+      stopPoseCamera();
+    } catch (err) {
+      console.error(err);
+      toast.error("Verification failed. Please try again.");
+    } finally {
+      setIsCapturingPose(false);
     }
   };
 
@@ -136,8 +250,8 @@ export default function ProfilePage() {
     setIsUploading(true);
     try {
       const userRef = doc(db, "users", user.uid);
-      await setDoc(userRef, { photoURL: "" }, { merge: true });
-      if (setProfile) setProfile({ ...profile, photoURL: "" } as any);
+      await setDoc(userRef, { photoURL: "", photoVerified: false }, { merge: true });
+      if (setProfile) setProfile({ ...profile, photoURL: "", photoVerified: false } as any);
       toast.success("Photo removed");
     } catch (err) {
       toast.error("Failed to remove photo");
@@ -158,7 +272,17 @@ export default function ProfilePage() {
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!user) return;
+
+    // Validate Profile Data
+    const validation = validateProfile(editData);
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Please check your profile details");
+      return;
+    }
+
     try {
       const parsedAge = parseInt(editData.age.toString());
       const updatedProfile = {
@@ -173,21 +297,6 @@ export default function ProfilePage() {
     } catch (err) {
       console.error("Profile update error:", err);
       toast.error("Failed to update profile");
-    }
-  };
-
-  const toggleInterest = (interest: string) => {
-    const updated = editData.interests.includes(interest) ? editData.interests.filter(i => i !== interest) : [...editData.interests, interest];
-    setEditData({...editData, interests: updated});
-  };
-
-  const addCustomInterest = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && customInterest.trim()) {
-      e.preventDefault();
-      if (!editData.interests.includes(customInterest.trim())) {
-        setEditData({ ...editData, interests: [...editData.interests, customInterest.trim()] });
-      }
-      setCustomInterest("");
     }
   };
 
@@ -208,35 +317,36 @@ export default function ProfilePage() {
   };
 
   if (loading || !profile) return (
-    <div className="min-h-screen flex items-center justify-center bg-white font-black italic text-3xl text-black">Datie.</div>
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-black font-black italic text-3xl text-black dark:text-white">Datie.</div>
   );
 
   return (
-    <main className="min-h-screen bg-white pt-32 pb-20 px-6">
+    <main className="min-h-screen bg-white dark:bg-black text-black dark:text-white pt-32 pb-20 px-6 transition-colors duration-300">
       <div className="max-w-5xl mx-auto">
         <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+        <canvas ref={canvasRef} className="hidden" />
 
         {/* Header Profile Section */}
         <div className="flex flex-col md:flex-row items-center gap-10 mb-16 animate-profile opacity-0">
           <div className="relative group cursor-pointer">
             <div 
               onClick={() => !isUploading && !isScanning && fileInputRef.current?.click()}
-              className="w-40 h-40 rounded-full border-4 border-black overflow-hidden bg-gray-50 flex items-center justify-center shadow-2xl relative group"
+              className="w-40 h-40 rounded-full border-4 border-black dark:border-neutral-700 overflow-hidden bg-gray-50 dark:bg-neutral-900 flex items-center justify-center shadow-2xl relative group"
             >
               {isScanning ? (
-                <div className="flex flex-col items-center gap-3 text-blue-600 animate-pulse">
+                <div className="flex flex-col items-center gap-3 text-blue-600 dark:text-blue-400 animate-pulse">
                   <ShieldAlert className="animate-bounce" size={48} />
                   <span className="text-[8px] font-black uppercase tracking-[0.3em]">AI Security Scan</span>
                 </div>
               ) : isUploading ? (
-                <div className="flex flex-col items-center gap-2 text-black">
+                <div className="flex flex-col items-center gap-2 text-black dark:text-white">
                   <Loader2 className="animate-spin" size={32} />
                   <span className="text-[10px] font-black uppercase">Syncing...</span>
                 </div>
               ) : profile?.photoURL || user?.photoURL ? (
                 <img src={profile?.photoURL || user?.photoURL || ""} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                <User size={64} className="text-black/10" />
+                <User size={64} className="text-black/10 dark:text-white/10" />
               )}
             </div>
 
@@ -252,19 +362,31 @@ export default function ProfilePage() {
             
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-2 right-2 p-3 bg-black text-white rounded-full shadow-xl hover:scale-110 transition-all cursor-pointer"
+              className="absolute bottom-2 right-2 p-3 bg-black dark:bg-white text-white dark:text-black rounded-full shadow-xl hover:scale-110 transition-all cursor-pointer"
             >
               <Camera size={16} />
             </div>
           </div>
 
           <div className="text-center md:text-left flex-1">
-            <h1 className="text-5xl font-black tracking-tighter mb-2 uppercase italic">{profile?.name || user?.displayName}</h1>
-            <div className="flex flex-wrap justify-center md:justify-start gap-4 text-gray-400 font-bold uppercase tracking-widest text-[10px]">
-              <span className="flex items-center gap-2 text-black border-r pr-4 border-gray-200"><MapPin size={12} /> {profile?.district}</span>
-              <span className="flex items-center gap-2 text-black border-r pr-4 border-gray-200"><Calendar size={12} /> {profile?.age} Yrs</span>
-              <span className="flex items-center gap-2 text-black border-r pr-4 border-gray-200"><Phone size={12} className="text-blue-500" /> {profile?.phone || "Private"}</span>
-              <span className="flex items-center gap-2 text-black"><Heart size={12} className="fill-black" /> {profile?.lookingFor}</span>
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-2">
+              <h1 className="text-5xl font-black tracking-tighter uppercase italic text-black dark:text-white">{profile?.name || user?.displayName}</h1>
+              {profile?.photoVerified ? (
+                <VerifiedBadge size="lg" showLabel />
+              ) : (
+                <button
+                  onClick={startPoseVerification}
+                  className="px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1.5 hover:scale-105 transition-all shadow-md"
+                >
+                  <Award size={14} /> Get Verified
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap justify-center md:justify-start gap-4 text-gray-400 dark:text-neutral-500 font-bold uppercase tracking-widest text-[10px]">
+              <span className="flex items-center gap-2 text-black dark:text-white border-r pr-4 border-gray-200 dark:border-neutral-800"><MapPin size={12} /> {profile?.district}</span>
+              <span className="flex items-center gap-2 text-black dark:text-white border-r pr-4 border-gray-200 dark:border-neutral-800"><Calendar size={12} /> {profile?.age} Yrs</span>
+              <span className="flex items-center gap-2 text-black dark:text-white border-r pr-4 border-gray-200 dark:border-neutral-800"><Phone size={12} className="text-blue-500" /> {profile?.phone || "Private"}</span>
+              <span className="flex items-center gap-2 text-black dark:text-white"><Heart size={12} className="fill-black dark:fill-white" /> {profile?.lookingFor}</span>
             </div>
           </div>
         </div>
@@ -273,10 +395,10 @@ export default function ProfilePage() {
         <div className="animate-profile opacity-0">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2 space-y-8">
-              <div className="p-8 border-2 border-black rounded-[2.5rem] shadow-xl bg-white">
+              <div className="p-8 border-2 border-black dark:border-neutral-700 rounded-[2.5rem] shadow-xl bg-white dark:bg-neutral-900">
                 <div className="flex justify-between items-center mb-10">
-                  <h2 className="text-3xl font-black italic tracking-tighter">My Story</h2>
-                  <button onClick={() => setIsEditing(!isEditing)} className="px-6 py-2 bg-black text-white rounded-full text-xs font-black uppercase tracking-widest hover:scale-105 transition-all">
+                  <h2 className="text-3xl font-black italic tracking-tighter text-black dark:text-white">My Story</h2>
+                  <button onClick={() => setIsEditing(!isEditing)} className="px-6 py-2 bg-black dark:bg-white text-white dark:text-black rounded-full text-xs font-black uppercase tracking-widest hover:scale-105 transition-all">
                     {isEditing ? "Cancel" : "Edit Profile"}
                   </button>
                 </div>
@@ -285,21 +407,21 @@ export default function ProfilePage() {
                   <div className="space-y-12">
                     {/* Step 1: Basics */}
                     <div className="space-y-4">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-300">1. Basics & Contact</h3>
+                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500">1. Basics & Contact</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <EditInput label="Full Name" value={editData.name} onChange={(v:string) => setEditData({...editData, name: v})} />
                         <EditInput label="Age" type="number" value={editData.age} onChange={(v:string) => setEditData({...editData, age: v})} />
                         <div className="space-y-4">
                            <div className="space-y-2">
-                             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-4">Verified Email</label>
-                             <div className="p-5 bg-gray-50 border-2 border-gray-100 rounded-full font-bold text-gray-400 flex items-center gap-4">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500 ml-4">Verified Email</label>
+                             <div className="p-5 bg-gray-50 dark:bg-neutral-800 border-2 border-gray-100 dark:border-neutral-700 rounded-full font-bold text-gray-400 dark:text-neutral-400 flex items-center gap-4">
                                 <Mail size={16} /> {user?.email}
                              </div>
                            </div>
                            
                            <div className="space-y-2">
-                             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-4">Verified Phone</label>
-                             <div className="p-5 bg-gray-50 border-2 border-gray-100 rounded-full font-bold text-gray-400 flex items-center gap-4">
+                             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500 ml-4">Verified Phone</label>
+                             <div className="p-5 bg-gray-50 dark:bg-neutral-800 border-2 border-gray-100 dark:border-neutral-700 rounded-full font-bold text-gray-400 dark:text-neutral-400 flex items-center gap-4">
                                 <Phone size={16} /> {editData.phone || "No phone added"}
                                 <div className="ml-auto text-green-500 flex items-center gap-1 text-[9px] uppercase font-black">
                                    <Check size={14} /> Verified
@@ -312,8 +434,8 @@ export default function ProfilePage() {
                       </div>
                     </div>
 
-                    <div className="space-y-4 pt-6 border-t border-gray-100">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-300">2. Personal Details</h3>
+                    <div className="space-y-4 pt-6 border-t border-gray-100 dark:border-neutral-800">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500">2. Personal Details</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <EditInput label="Profession" value={editData.profession} onChange={(v:string) => setEditData({...editData, profession: v})} />
                         <EditInput label="Education" value={editData.education} onChange={(v:string) => setEditData({...editData, education: v})} />
@@ -322,16 +444,16 @@ export default function ProfilePage() {
                       </div>
                     </div>
 
-                    <div className="space-y-4 pt-6 border-t border-gray-100">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-300">3. Vibe & Bio</h3>
+                    <div className="space-y-4 pt-6 border-t border-gray-100 dark:border-neutral-800">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500">3. Vibe & Bio</h3>
                       <EditSelect label="Looking For" value={editData.lookingFor} options={LOOKING_FOR} onChange={(v) => setEditData({...editData, lookingFor: v})} />
                       
                       {/* Interests Input */}
                       <div className="space-y-4 mt-6">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">My Interests</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500">My Interests</label>
                         <div className="flex flex-wrap gap-2">
                           {editData.interests.map((i: string) => (
-                            <span key={i} className="px-4 py-2 bg-black text-white rounded-full text-[10px] font-black uppercase flex items-center gap-2">
+                            <span key={i} className="px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-full text-[10px] font-black uppercase flex items-center gap-2">
                               {i} <X size={12} className="cursor-pointer" onClick={() => toggleInterest(i)} />
                             </span>
                           ))}
@@ -343,27 +465,27 @@ export default function ProfilePage() {
                             onChange={(e) => setCustomInterest(e.target.value)} 
                             onKeyDown={addCustomInterest} 
                             placeholder="Type interest & hit Enter (e.g. Travel, Music)..." 
-                            className="w-full p-5 border-2 border-black rounded-2xl font-bold italic text-sm focus:outline-none bg-white shadow-sm" 
+                            className="w-full p-5 border-2 border-black dark:border-neutral-700 rounded-2xl font-bold italic text-sm focus:outline-none bg-white dark:bg-neutral-800 text-black dark:text-white shadow-sm" 
                           />
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-gray-50 rounded-lg">
-                             <Plus size={16} className="text-gray-400" />
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-gray-50 dark:bg-neutral-700 rounded-lg">
+                             <Plus size={16} className="text-gray-400 dark:text-neutral-300" />
                           </div>
                         </div>
                       </div>
 
                       <div className="space-y-2 mt-6">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bio</label>
-                        <textarea value={editData.bio} onChange={(e) => setEditData({...editData, bio: e.target.value})} placeholder="Tell your story..." className="w-full p-6 border-2 border-black rounded-[2rem] min-h-[150px] font-medium focus:outline-none bg-white shadow-sm" />
+                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500">Bio</label>
+                        <textarea value={editData.bio} onChange={(e) => setEditData({...editData, bio: e.target.value})} placeholder="Tell your story..." className="w-full p-6 border-2 border-black dark:border-neutral-700 rounded-[2rem] min-h-[150px] font-medium focus:outline-none bg-white dark:bg-neutral-800 text-black dark:text-white shadow-sm" />
                       </div>
                     </div>
 
-                    <button onClick={handleUpdateProfile} className="w-full py-6 bg-black text-white rounded-full font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-2xl hover:scale-[1.02] transition-all">
+                    <button onClick={handleUpdateProfile} className="w-full py-6 bg-black dark:bg-white text-white dark:text-black rounded-full font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-2xl hover:scale-[1.02] transition-all">
                       <Save size={24} /> Complete Profile
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-12">
-                    <p className="text-2xl text-gray-600 leading-relaxed font-medium italic">&quot;{profile?.bio || "A great connection needs a story. Click edit to start yours..."}&quot;</p>
+                    <p className="text-2xl text-gray-600 dark:text-neutral-300 leading-relaxed font-medium italic">&quot;{profile?.bio || "A great connection needs a story. Click edit to start yours..."}&quot;</p>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
                       <InfoBadge icon={<Briefcase size={16}/>} label="Work" value={profile?.profession} />
                       <InfoBadge icon={<GraduationCap size={16}/>} label="Education" value={profile?.education} />
@@ -375,11 +497,11 @@ export default function ProfilePage() {
 
                     {/* Interests Section in View Mode */}
                     {profile?.interests && profile.interests.length > 0 && (
-                      <div className="pt-10 border-t border-gray-100">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 mb-6">My Vibes</h3>
+                      <div className="pt-10 border-t border-gray-100 dark:border-neutral-800">
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 dark:text-neutral-500 mb-6">My Vibes</h3>
                         <div className="flex flex-wrap gap-3">
                           {profile.interests.map((interest: string) => (
-                            <span key={interest} className="px-6 py-3 bg-gray-50 border-2 border-black/5 rounded-full text-[10px] font-black uppercase tracking-widest text-black">
+                            <span key={interest} className="px-6 py-3 bg-gray-50 dark:bg-neutral-800 border-2 border-black/5 dark:border-neutral-700 rounded-full text-[10px] font-black uppercase tracking-widest text-black dark:text-white">
                               {interest}
                             </span>
                           ))}
@@ -394,7 +516,7 @@ export default function ProfilePage() {
             {/* Sidebar: Score & Settings */}
             <div className="space-y-8">
               {/* Identity Score */}
-              <div className="p-8 bg-black text-white rounded-[2.5rem] shadow-2xl text-center overflow-hidden animate-profile opacity-0">
+              <div className="p-8 bg-black dark:bg-neutral-900 border-2 border-black dark:border-neutral-700 text-white rounded-[2.5rem] shadow-2xl text-center overflow-hidden animate-profile opacity-0">
                  <h3 className="text-[10px] font-black uppercase tracking-[0.4em] mb-4 opacity-50">Identity Score</h3>
                  <div className="text-7xl font-black text-blue-400 mb-2">
                    {(() => {
@@ -408,7 +530,7 @@ export default function ProfilePage() {
                      const filled = fields.filter(f => f).length;
                      if (filled < fields.length) {
                        return (
-                         <div className="mt-4 p-4 bg-white/5 rounded-2xl border border-white/10">
+                         <div className="mt-4 p-4 bg-white/5 dark:bg-white/10 rounded-2xl border border-white/10">
                             <p className="text-[9px] font-bold uppercase tracking-widest text-blue-300 animate-pulse">
                                Finish your story to reach 100%
                             </p>
@@ -421,12 +543,27 @@ export default function ProfilePage() {
 
               {/* Settings & Security Section */}
               <div className="space-y-6 animate-profile opacity-0">
-                 <div className="p-8 border-2 border-gray-100 rounded-[2.5rem] bg-white">
-                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 mb-6">Account Settings</h3>
+                 <div className="p-8 border-2 border-gray-100 dark:border-neutral-800 rounded-[2.5rem] bg-white dark:bg-neutral-900">
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 dark:text-neutral-500 mb-6">Account Settings</h3>
                     <div className="space-y-4">
                        <button 
+                         onClick={async () => {
+                           if (user) {
+                             const res = await requestNotificationPermission(user.uid);
+                             if (res.granted && setProfile && profile) {
+                               setProfile({ ...profile, notificationsEnabled: true } as any);
+                             }
+                           }
+                         }}
+                         className="w-full py-4 flex items-center justify-center gap-3 bg-gray-50 dark:bg-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-700 text-black dark:text-white font-black uppercase text-[10px] tracking-widest rounded-2xl hover:scale-[1.02] transition-all border border-gray-200 dark:border-neutral-700"
+                       >
+                         <BellRing size={16} className={profile?.notificationsEnabled ? "text-blue-500" : "text-gray-400"} />
+                         {profile?.notificationsEnabled ? "Push Notifications Active" : "Enable Push Notifications"}
+                       </button>
+
+                       <button 
                          onClick={logout}
-                         className="w-full py-4 flex items-center justify-center gap-3 bg-black text-white font-black uppercase text-[10px] tracking-widest rounded-2xl hover:scale-[1.02] transition-all shadow-lg"
+                         className="w-full py-4 flex items-center justify-center gap-3 bg-black dark:bg-white text-white dark:text-black font-black uppercase text-[10px] tracking-widest rounded-2xl hover:scale-[1.02] transition-all shadow-lg"
                        >
                          <LogOut size={16} /> Logout Session
                        </button>
@@ -434,7 +571,7 @@ export default function ProfilePage() {
                  </div>
 
                  {/* Danger Zone */}
-                 <div className="p-8 bg-red-50/30 rounded-[2.5rem] border-2 border-dashed border-red-50">
+                 <div className="p-8 bg-red-50/30 dark:bg-red-950/20 rounded-[2.5rem] border-2 border-dashed border-red-100 dark:border-red-900/40">
                     <div className="text-center space-y-4">
                        <div className="flex flex-col items-center gap-2">
                           <ShieldAlert size={20} className="text-red-400" />
@@ -442,7 +579,7 @@ export default function ProfilePage() {
                        </div>
                        <button 
                          onClick={handleRequestDeletion}
-                         className="w-full py-3 bg-white text-red-500 border border-red-100 font-black uppercase text-[9px] tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                         className="w-full py-3 bg-white dark:bg-neutral-900 text-red-500 border border-red-100 dark:border-red-900/40 font-black uppercase text-[9px] tracking-widest rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
                        >
                          Request Deletion
                        </button>
@@ -454,17 +591,87 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+      {/* Selfie Pose Photo Verification Modal */}
+      {showPoseModal && (
+        <div className="fixed inset-0 z-[220] flex items-center justify-center p-6 bg-black/85 backdrop-blur-xl animate-fade-in">
+           <div className="bg-white dark:bg-neutral-900 text-black dark:text-white border-2 border-black dark:border-neutral-700 rounded-[3rem] p-8 max-w-md w-full text-center space-y-6 animate-match-card shadow-2xl relative overflow-hidden">
+              <button 
+                onClick={stopPoseCamera} 
+                className="absolute top-6 right-6 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-4 py-1 bg-blue-500/10 text-blue-500 rounded-full text-[10px] font-black uppercase tracking-widest">
+                   <ShieldCheck size={14} /> Official Photo Verification
+                </div>
+                <h3 className="text-3xl font-black italic tracking-tighter uppercase">Selfie Pose Check</h3>
+                <p className="text-gray-500 dark:text-neutral-400 text-xs font-medium leading-relaxed">
+                  Match the pose below with your camera to earn the <strong className="text-blue-500 font-bold">Verified Shield</strong>.
+                </p>
+              </div>
+
+              {/* Pose Instruction Badge */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border-2 border-blue-500/30 rounded-2xl flex items-center gap-4 text-left">
+                <span className="text-4xl shrink-0">{currentPose.emoji}</span>
+                <div>
+                   <h4 className="font-black text-xs uppercase text-blue-600 dark:text-blue-400 tracking-wider">{currentPose.label}</h4>
+                   <p className="text-[11px] text-gray-600 dark:text-neutral-300 font-medium">{currentPose.instruction}</p>
+                </div>
+              </div>
+
+              {/* Video Viewfinder */}
+              <div className="relative aspect-square w-full rounded-[2.5rem] overflow-hidden border-2 border-black dark:border-neutral-700 bg-neutral-950 shadow-inner">
+                 <video 
+                   ref={videoRef} 
+                   autoPlay 
+                   playsInline 
+                   muted 
+                   className="w-full h-full object-cover scale-x-[-1]" 
+                 />
+                 <div className="absolute inset-0 border-4 border-dashed border-white/30 rounded-[2.5rem] pointer-events-none" />
+                 {isCapturingPose && (
+                   <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-white">
+                      <Loader2 size={36} className="animate-spin text-blue-400" />
+                      <span className="text-xs font-black uppercase tracking-widest">Verifying Pose with AI...</span>
+                   </div>
+                 )}
+              </div>
+
+              <div className="flex flex-col gap-3">
+                 <button
+                   onClick={capturePoseAndVerify}
+                   disabled={isCapturingPose}
+                   className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full font-black uppercase tracking-widest text-xs shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                 >
+                   <Camera size={18} /> Capture & Verify Pose
+                 </button>
+                 <button 
+                   onClick={() => {
+                     const next = POSE_CHALLENGES[(POSE_CHALLENGES.indexOf(currentPose) + 1) % POSE_CHALLENGES.length];
+                     setCurrentPose(next);
+                   }}
+                   className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500 hover:text-black dark:hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+                 >
+                   <RefreshCw size={12} /> Switch to Different Pose
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* OTP Verification Modal */}
       {verificationId && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fade-in">
-           <div className="bg-white rounded-[3rem] p-10 max-w-sm w-full text-center space-y-8 animate-match-card">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-500">
+           <div className="bg-white dark:bg-neutral-900 text-black dark:text-white border-2 border-black dark:border-neutral-700 rounded-[3rem] p-10 max-w-sm w-full text-center space-y-8 animate-match-card">
+              <div className="w-20 h-20 bg-blue-50 dark:bg-neutral-800 rounded-full flex items-center justify-center mx-auto text-blue-500">
                  <ShieldAlert size={40} />
               </div>
               <div>
                 <h3 className="text-3xl font-black italic tracking-tighter uppercase mb-2">Verify Phone</h3>
-                <p className="text-gray-400 font-black uppercase text-[10px] tracking-widest leading-relaxed">
-                  Enter the 6-digit code we sent to your number. For testing, use: <span className="text-black">123456</span>
+                <p className="text-gray-400 dark:text-neutral-500 font-black uppercase text-[10px] tracking-widest leading-relaxed">
+                  Enter the 6-digit code we sent to your number. For testing, use: <span className="text-black dark:text-white">123456</span>
                 </p>
               </div>
               <input 
@@ -473,11 +680,11 @@ export default function ProfilePage() {
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value)}
                 placeholder="000000"
-                className="w-full p-6 bg-gray-50 border-2 border-black rounded-2xl text-center text-3xl font-black tracking-[0.5em] focus:outline-none"
+                className="w-full p-6 bg-gray-50 dark:bg-neutral-800 border-2 border-black dark:border-neutral-700 text-black dark:text-white rounded-2xl text-center text-3xl font-black tracking-[0.5em] focus:outline-none"
               />
               <div className="flex flex-col gap-3">
-                 <button onClick={handleVerifyOTP} className="w-full py-5 bg-black text-white rounded-full font-black uppercase tracking-widest text-xs shadow-xl">Verify Code</button>
-                 <button onClick={() => setVerificationId(null)} className="text-gray-400 font-black uppercase text-[10px] tracking-widest">Cancel</button>
+                 <button onClick={handleVerifyOTP} className="w-full py-5 bg-black dark:bg-white text-white dark:text-black rounded-full font-black uppercase tracking-widest text-xs shadow-xl">Verify Code</button>
+                 <button onClick={() => setVerificationId(null)} className="text-gray-400 dark:text-neutral-500 font-black uppercase text-[10px] tracking-widest">Cancel</button>
               </div>
            </div>
         </div>
@@ -489,8 +696,8 @@ export default function ProfilePage() {
 function EditInput({ label, value, onChange, type = "text" }: any) {
   return (
     <div className="space-y-2">
-      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full p-4 border-2 border-black rounded-2xl font-bold focus:ring-0 focus:outline-none bg-white" />
+      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500">{label}</label>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="w-full p-4 border-2 border-black dark:border-neutral-700 rounded-2xl font-bold focus:ring-0 focus:outline-none bg-white dark:bg-neutral-800 text-black dark:text-white" />
     </div>
   );
 }
@@ -498,8 +705,8 @@ function EditInput({ label, value, onChange, type = "text" }: any) {
 function EditSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
   return (
     <div className="space-y-2">
-      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full p-4 border-2 border-black rounded-2xl font-bold appearance-none bg-white">
+      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500">{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full p-4 border-2 border-black dark:border-neutral-700 rounded-2xl font-bold appearance-none bg-white dark:bg-neutral-800 text-black dark:text-white">
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
@@ -510,8 +717,8 @@ function InfoBadge({ icon, label, value }: { icon: any; label: string; value: an
   if (!value) return null;
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-2 text-gray-400 text-[9px] font-black uppercase tracking-widest">{icon} {label}</div>
-      <div className="font-black text-sm">{value}</div>
+      <div className="flex items-center gap-2 text-gray-400 dark:text-neutral-500 text-[9px] font-black uppercase tracking-widest">{icon} {label}</div>
+      <div className="font-black text-sm text-black dark:text-white">{value}</div>
     </div>
   );
 }

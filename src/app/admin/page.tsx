@@ -96,11 +96,14 @@ export default function AdminDashboard() {
       // 2. Delete the user profile doc directly from Firestore (Instant)
       await deleteDoc(doc(db, "users", uid));
 
-      // 3. Delete any deletion request for this user
-      if (requestId) {
-        try {
-          await deleteDoc(doc(db, "deletion_requests", requestId));
-        } catch {}
+      // 3. Delete all deletion requests for this user
+      try {
+        const delReqs = await getDocs(query(collection(db, "deletion_requests"), where("uid", "==", uid)));
+        const batch = writeBatch(db);
+        delReqs.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      } catch (reqErr) {
+        console.warn("Could not batch delete requests:", reqErr);
       }
 
       // 4. Cascading delete for likes, matches, blocks, reports
@@ -132,7 +135,7 @@ export default function AdminDashboard() {
 
       // 5. Update UI instantly
       setAllUsers(prev => prev.filter(u => u.uid !== uid));
-      setRequests(prev => prev.filter(r => r.uid !== uid && r.id !== requestId));
+      setRequests(prev => prev.filter(r => r.uid !== uid));
       setReports(prev => prev.filter(rep => rep.reportedId !== uid));
 
       toast.success("User Entirely Vanished & Purged from Firestore!");

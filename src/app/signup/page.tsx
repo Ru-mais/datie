@@ -26,7 +26,8 @@ export default function SignupPage() {
     password: "",
     age: "",
     phone: "",
-    district: "Ernakulam"
+    district: "Ernakulam",
+    gender: "Male"
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,11 +65,12 @@ export default function SignupPage() {
         age: parseInt(formData.age),
         phone: formData.phone,
         phoneVerified: true,
-        district: formData.district
+        district: formData.district,
+        gender: formData.gender
       });
       
       toast.success("Welcome to Datie! Your account has been created.");
-      router.push("/discover");
+      router.push("/verify-email");
     } catch (err: unknown) {
       console.error(err);
       const errorMessage = err instanceof Error ? err.message : "Signup failed. Account may already exist.";
@@ -78,61 +80,61 @@ export default function SignupPage() {
     }
   };
   return (
-    <main className="min-h-screen flex items-center justify-center bg-white px-6 pt-32 pb-20 relative overflow-hidden">
+    <main className="min-h-screen flex items-center justify-center bg-white dark:bg-black text-black dark:text-white px-6 pt-32 pb-20 relative overflow-hidden transition-colors duration-300">
       
-      <div className="w-full max-w-xl p-10 border-2 border-black rounded-[3rem] shadow-2xl animate-signup opacity-0 bg-white z-10">
+      <div className="w-full max-w-xl p-10 border-2 border-black dark:border-neutral-700 rounded-[3rem] shadow-2xl animate-signup opacity-0 bg-white dark:bg-neutral-900 z-10">
         <div className="text-center mb-10 space-y-2">
-           <h1 className="text-6xl font-black tracking-tighter italic uppercase leading-tight">Datie.</h1>
-           <p className="text-gray-400 font-black uppercase text-[10px] tracking-widest">Create your verified profile.</p>
+           <h1 className="text-6xl font-black tracking-tighter italic uppercase leading-tight text-black dark:text-white">Datie.</h1>
+           <p className="text-gray-400 dark:text-neutral-500 font-black uppercase text-[10px] tracking-widest">Create your verified profile.</p>
         </div>
 
         <form onSubmit={handleSignup} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2 animate-signup opacity-0">
-              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-4">Full Name</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500 ml-4">Full Name</label>
               <div className="relative">
-                <User className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <User className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 dark:text-neutral-500" size={18} />
                 <input 
                   type="text" required placeholder="Name" 
                   value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
-                  className="w-full pl-16 pr-6 py-5 bg-gray-50 border-2 border-transparent focus:border-black rounded-full font-bold transition-all outline-none" 
+                  className="w-full pl-16 pr-6 py-5 bg-gray-50 dark:bg-neutral-800 border-2 border-transparent focus:border-black dark:focus:border-neutral-500 text-black dark:text-white rounded-full font-bold transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-neutral-600" 
                 />
               </div>
             </div>
 
             <div className="space-y-2 animate-signup opacity-0">
-              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-4">Age</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500 ml-4">Age</label>
               <div className="relative">
-                <Calendar className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <Calendar className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 dark:text-neutral-500" size={18} />
                 <input 
                   type="number" required min="18" placeholder="Age" 
                   value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})}
-                  className="w-full pl-16 pr-6 py-5 bg-gray-50 border-2 border-transparent focus:border-black rounded-full font-bold transition-all outline-none" 
+                  className="w-full pl-16 pr-6 py-5 bg-gray-50 dark:bg-neutral-800 border-2 border-transparent focus:border-black dark:focus:border-neutral-500 text-black dark:text-white rounded-full font-bold transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-neutral-600" 
                 />
               </div>
             </div>
           </div>
 
           <div className="space-y-2 animate-signup opacity-0">
-            <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-4">Email Address</label>
+            <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500 ml-4">Email Address</label>
             <div className="relative">
-              <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 dark:text-neutral-500" size={18} />
               <input 
                 type="email" required placeholder="you@example.com" 
                 value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
-                className="w-full pl-16 pr-6 py-5 bg-gray-50 border-2 border-transparent focus:border-black rounded-full font-bold transition-all outline-none" 
+                className="w-full pl-16 pr-6 py-5 bg-gray-50 dark:bg-neutral-800 border-2 border-transparent focus:border-black dark:focus:border-neutral-500 text-black dark:text-white rounded-full font-bold transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-neutral-600" 
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2 animate-signup opacity-0">
-              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-4">District</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500 ml-4">District</label>
               <div className="relative">
-                <MapPin className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <MapPin className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 dark:text-neutral-500" size={18} />
                 <select 
                   value={formData.district} onChange={e => setFormData({...formData, district: e.target.value})}
-                  className="w-full pl-16 pr-6 py-5 bg-gray-50 border-2 border-transparent focus:border-black rounded-full font-bold transition-all outline-none appearance-none"
+                  className="w-full pl-16 pr-6 py-5 bg-gray-50 dark:bg-neutral-800 border-2 border-transparent focus:border-black dark:focus:border-neutral-500 text-black dark:text-white rounded-full font-bold transition-all outline-none appearance-none"
                 >
                   {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
@@ -140,41 +142,57 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2 animate-signup opacity-0">
-              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-4">Phone Number</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500 ml-4">Gender</label>
               <div className="relative">
-                <Phone className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <User className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 dark:text-neutral-500" size={18} />
+                <select 
+                  value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})}
+                  className="w-full pl-16 pr-6 py-5 bg-gray-50 dark:bg-neutral-800 border-2 border-transparent focus:border-black dark:focus:border-neutral-500 text-black dark:text-white rounded-full font-bold transition-all outline-none appearance-none"
+                >
+                  {["Male", "Female", "Other"].map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div className="space-y-2 animate-signup opacity-0">
+              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500 ml-4">Phone Number</label>
+              <div className="relative">
+                <Phone className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 dark:text-neutral-500" size={18} />
                 <input 
                   type="tel" required placeholder="00000 00000" 
                   value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
-                  className="w-full pl-16 pr-6 py-5 bg-gray-50 border-2 border-transparent focus:border-black rounded-full font-bold transition-all outline-none" 
+                  className="w-full pl-16 pr-6 py-5 bg-gray-50 dark:bg-neutral-800 border-2 border-transparent focus:border-black dark:focus:border-neutral-500 text-black dark:text-white rounded-full font-bold transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-neutral-600" 
                 />
               </div>
             </div>
           </div>
 
           <div className="space-y-2 animate-signup opacity-0">
-            <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-4">Password</label>
+            <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500 ml-4">Password</label>
             <div className="relative">
-              <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 dark:text-neutral-500" size={18} />
               <input 
                 type="password" required placeholder="••••••••" 
                 value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
-                className="w-full pl-16 pr-6 py-5 bg-gray-50 border-2 border-transparent focus:border-black rounded-full font-bold transition-all outline-none" 
+                className="w-full pl-16 pr-6 py-5 bg-gray-50 dark:bg-neutral-800 border-2 border-transparent focus:border-black dark:focus:border-neutral-500 text-black dark:text-white rounded-full font-bold transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-neutral-600" 
               />
             </div>
           </div>
 
           <button 
             disabled={isSubmitting}
-            className="w-full py-6 bg-black text-white rounded-full font-black uppercase tracking-widest text-xs hover:scale-[1.02] transition-all flex items-center justify-center gap-3 shadow-2xl disabled:opacity-50 mt-4"
+            className="w-full py-6 bg-black dark:bg-white text-white dark:text-black rounded-full font-black uppercase tracking-widest text-xs hover:scale-[1.02] transition-all flex items-center justify-center gap-3 shadow-2xl disabled:opacity-50 mt-4"
           >
             {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : "Join Datie."}
             <ArrowRight size={20} />
           </button>
         </form>
 
-        <p className="mt-8 text-center text-[10px] font-black uppercase tracking-widest text-gray-400">
-          Already a member? <Link href="/login" className="text-black underline">Sign In</Link>
+        <p className="mt-8 text-center text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-neutral-500">
+          Already a member? <Link href="/login" className="text-black dark:text-white underline">Sign In</Link>
         </p>
       </div>
     </main>

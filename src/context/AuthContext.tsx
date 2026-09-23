@@ -20,6 +20,8 @@ interface UserProfile {
   district?: string;
   phone?: string;
   phoneVerified?: boolean;
+  photoVerified?: boolean;
+  verifiedPose?: string;
   photoURL?: string;
   bio?: string;
   interests?: string[];
@@ -31,6 +33,9 @@ interface UserProfile {
   religion?: string;
   height?: string;
   vibe?: string[];
+  notificationsEnabled?: boolean;
+  fcmToken?: string;
+  fcmTokens?: string[];
 }
 
 interface CustomUser {
